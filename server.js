@@ -7,8 +7,13 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 
 // ============================================
-// 🔒 SECURITY: Validate Environment Variables
+// 🔧 CONFIGURATION
 // ============================================
+// Set your GitHub Pages URL here (or use environment variable)
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://securecentrix81.github.io/insecure_chat";
+// ============================================
+
+// Environment variables validation
 if (!process.env.MONGO_URI) {
   console.error("❌ CRITICAL: MONGO_URI environment variable is not set!");
   process.exit(1);
@@ -20,30 +25,26 @@ if (!process.env.SALT) {
   process.exit(1);
 }
 
-// Environment variables
 const MONGO_URI = process.env.MONGO_URI;
 const SALT = process.env.SALT;
-const SALT_ROUNDS = 14;
+const SALT_ROUNDS = 12;
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // ============================================
-// 🔒 SECURITY: Socket.IO with CORS
+// 🔒 CORS Configuration for GitHub Pages
 // ============================================
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(",") 
-  : ["http://localhost:3000"];
-
 const io = require("socket.io")(server, {
   cors: {
-    origin: NODE_ENV === "production" ? allowedOrigins : "*",
+    origin: NODE_ENV === "production" 
+      ? [FRONTEND_URL, FRONTEND_URL.replace(/\/$/, "")] // Remove trailing slash variants
+      : "*",
     methods: ["GET", "POST"],
     credentials: true
   },
-  pingTimeout: 60000,
-  pingInterval: 25000
+  transports: ["websocket", "polling"]
 });
 
-// Encryption helpers using AES-256-GCM
+// Encryption helpers
 const ENCRYPTION_KEY = crypto.scryptSync(SALT, "secure-chat-salt", 32);
 
 function encrypt(text) {
@@ -72,20 +73,19 @@ function decrypt(encryptedData) {
   }
 }
 
-// MongoDB connection with secure options
+// MongoDB connection
 mongoose.connect(MONGO_URI, {
-  // These options help prevent certain attacks
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
 })
-  .then(() => console.log("🔒 Connected to MongoDB securely"))
+  .then(() => console.log("🔒 Connected to MongoDB"))
   .catch(err => {
-    console.error("MongoDB connection error:", err.message); // Don't log full error (may contain credentials)
+    console.error("MongoDB connection error:", err.message);
     process.exit(1);
   });
 
-// User Schema with encrypted username storage
+// User Schema
 const userSchema = new mongoose.Schema({
   usernameHash: { type: String, required: true, unique: true, index: true },
   usernameEncrypted: { type: String, required: true },
@@ -106,30 +106,25 @@ const roomSchema = new mongoose.Schema({
 
 const Room = mongoose.model("Room", roomSchema);
 
-// Session management (in-memory for active sessions only)
+// Session management
 const activeSessions = new Map();
-const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_EXPIRY = 24 * 60 * 60 * 1000;
 
-// Generate secure session token
 function generateSessionToken() {
   return crypto.randomBytes(64).toString("hex");
 }
 
-// Hash username for lookup (deterministic)
 function hashUsername(username) {
   return crypto.createHmac("sha256", SALT).update(username.toLowerCase().trim()).digest("hex");
 }
 
-// ============================================
-// 🔒 SECURITY: Enhanced Rate Limiting
-// ============================================
+// Rate limiting
 const rateLimits = new Map();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
 
 const RATE_LIMITS = {
   login: { max: 5, window: 60000 },
   signup: { max: 3, window: 60000 },
-  "change-password": { max: 3, window: 300000 }, // 5 minutes
+  "change-password": { max: 3, window: 300000 },
   "change-username": { max: 3, window: 300000 },
   "join-room": { max: 10, window: 60000 },
   "message": { max: 30, window: 60000 }
@@ -152,18 +147,16 @@ function checkRateLimit(identifier, action) {
   return record.attempts <= config.max;
 }
 
-// Clean up old rate limit records and expired sessions periodically
+// Cleanup interval
 setInterval(() => {
   const now = Date.now();
   
-  // Clean rate limits
   for (const [key, record] of rateLimits) {
-    if (now - record.windowStart > 600000) { // 10 minutes
+    if (now - record.windowStart > 600000) {
       rateLimits.delete(key);
     }
   }
   
-  // Clean expired sessions
   for (const [token, session] of activeSessions) {
     if (session.createdAt && now - session.createdAt > SESSION_EXPIRY) {
       activeSessions.delete(token);
@@ -172,25 +165,45 @@ setInterval(() => {
 }, 300000);
 
 // ============================================
-// 🔒 SECURITY: Only serve public directory!
+// 🔒 Security Headers & CORS for HTTP
 // ============================================
-app.use(express.static(__dirname + "/public"));
-
-// 🔒 SECURITY: Add security headers manually (or use helmet)
 app.use((req, res, next) => {
+  // CORS headers for GitHub Pages
+  const origin = req.headers.origin;
+  if (origin === FRONTEND_URL || origin === FRONTEND_URL.replace(/\/$/, "") || NODE_ENV !== "production") {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  
+  // Security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  if (NODE_ENV === "production") {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
   }
+  
   next();
 });
 
-// ============================================
-// 🔒 SECURITY: Input Validation Helpers
-// ============================================
+// Health check endpoint (useful for Render)
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    message: "Insecure Chat Backend is running",
+    frontend: FRONTEND_URL
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
+// Input validation helpers
 function validateUsername(username) {
   if (!username || typeof username !== "string") return false;
   if (username.length < 3 || username.length > 30) return false;
@@ -231,22 +244,20 @@ io.on("connection", (socket) => {
   
   let currentSession = null;
   
-  // Secure LOGIN
+  // LOGIN
   socket.on("login", async (data) => {
     try {
       const { username, password } = data || {};
       
-      // Rate limiting
       if (!checkRateLimit(clientIP, "login")) {
         socket.emit("login-result", {
           success: false,
-          message: "⚠️ Too many login attempts. Please wait a minute before trying again.",
+          message: "⚠️ Too many login attempts. Please wait a minute.",
           type: "error"
         });
         return;
       }
       
-      // Validate input
       if (!validateUsername(username)) {
         socket.emit("login-result", {
           success: false,
@@ -268,9 +279,7 @@ io.on("connection", (socket) => {
       const usernameHash = hashUsername(username);
       const user = await User.findOne({ usernameHash });
       
-      // Generic error to prevent username enumeration
       if (!user) {
-        // Add artificial delay to prevent timing attacks
         await new Promise(r => setTimeout(r, 100 + Math.random() * 100));
         socket.emit("login-result", {
           success: false,
@@ -291,11 +300,9 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Update last login
       user.lastLogin = new Date();
       await user.save();
       
-      // Create session
       const sessionToken = generateSessionToken();
       const decryptedUsername = decrypt(user.usernameEncrypted);
       
@@ -335,22 +342,20 @@ io.on("connection", (socket) => {
     }
   });
   
-  // Secure SIGNUP
+  // SIGNUP
   socket.on("signup", async (data) => {
     try {
       const { username, password } = data || {};
       
-      // Rate limiting
       if (!checkRateLimit(clientIP, "signup")) {
         socket.emit("signup-result", {
           success: false,
-          message: "⚠️ Too many signup attempts. Please wait a minute.",
+          message: "⚠️ Too many signup attempts. Please wait.",
           type: "error"
         });
         return;
       }
       
-      // Validate username
       if (!validateUsername(username)) {
         socket.emit("signup-result", {
           success: false,
@@ -360,7 +365,6 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Validate password
       if (!validatePassword(password)) {
         socket.emit("signup-result", {
           success: false,
@@ -372,24 +376,19 @@ io.on("connection", (socket) => {
       
       const usernameHash = hashUsername(username);
       
-      // Check if username exists
       const existingUser = await User.findOne({ usernameHash });
       if (existingUser) {
         socket.emit("signup-result", {
           success: false,
-          message: "🔓 This username is already taken. Try another one!",
+          message: "🔓 This username is already taken.",
           type: "error"
         });
         return;
       }
       
-      // Hash password with bcrypt and additional salt
       const passwordHash = await bcrypt.hash(password + SALT, SALT_ROUNDS);
-      
-      // Encrypt username for storage
       const usernameEncrypted = encrypt(username);
       
-      // Create user
       const newUser = new User({
         usernameHash,
         usernameEncrypted,
@@ -398,7 +397,6 @@ io.on("connection", (socket) => {
       
       await newUser.save();
       
-      // Auto-login after signup
       const sessionToken = generateSessionToken();
       currentSession = {
         token: sessionToken,
@@ -413,7 +411,7 @@ io.on("connection", (socket) => {
         success: true,
         user: { username },
         sessionToken: sessionToken,
-        message: "🔓 Account created! Welcome to Insecure Chat!"
+        message: "🔓 Account created! Welcome!"
       });
       
       console.log(`[SIGNUP] New user created`);
@@ -427,7 +425,7 @@ io.on("connection", (socket) => {
     }
   });
   
-  // Session validation
+  // SESSION VALIDATION
   socket.on("validate-session", async (data) => {
     const { sessionToken } = data || {};
     
@@ -450,12 +448,11 @@ io.on("connection", (socket) => {
     }
   });
   
-  // Secure CHANGE USERNAME
+  // CHANGE USERNAME
   socket.on("change-username", async (data) => {
     try {
       const { sessionToken, newUsername, password } = data || {};
       
-      // Rate limiting
       if (!checkRateLimit(clientIP, "change-username")) {
         socket.emit("change-username-result", {
           success: false,
@@ -473,7 +470,6 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Validate new username
       if (!validateUsername(newUsername)) {
         socket.emit("change-username-result", {
           success: false,
@@ -482,11 +478,10 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Require password verification
       if (!password || typeof password !== "string") {
         socket.emit("change-username-result", {
           success: false,
-          message: "🔓 Password required to change username."
+          message: "🔓 Password required."
         });
         return;
       }
@@ -511,7 +506,6 @@ io.on("connection", (socket) => {
       
       const newUsernameHash = hashUsername(newUsername);
       
-      // Check if new username is taken
       const existingUser = await User.findOne({ usernameHash: newUsernameHash });
       if (existingUser && existingUser.usernameHash !== session.usernameHash) {
         socket.emit("change-username-result", {
@@ -521,19 +515,17 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Update user
       user.usernameHash = newUsernameHash;
       user.usernameEncrypted = encrypt(newUsername);
       await user.save();
       
-      // Update session
       session.usernameHash = newUsernameHash;
       session.username = newUsername;
       
       socket.emit("change-username-result", {
         success: true,
         username: newUsername,
-        message: "🔓 Username changed successfully!"
+        message: "🔓 Username changed!"
       });
       
       console.log(`[CHANGE] Username updated`);
@@ -546,12 +538,11 @@ io.on("connection", (socket) => {
     }
   });
   
-  // Secure CHANGE PASSWORD
+  // CHANGE PASSWORD
   socket.on("change-password", async (data) => {
     try {
       const { sessionToken, oldPassword, newPassword } = data || {};
       
-      // Rate limiting
       if (!checkRateLimit(clientIP, "change-password")) {
         socket.emit("change-password-result", {
           success: false,
@@ -603,16 +594,15 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Hash new password
       user.passwordHash = await bcrypt.hash(newPassword + SALT, SALT_ROUNDS);
       await user.save();
       
       socket.emit("change-password-result", {
         success: true,
-        message: "🔓 Password changed successfully!"
+        message: "🔓 Password changed!"
       });
       
-      console.log(`[CHANGE] Password updated for user`);
+      console.log(`[CHANGE] Password updated`);
     } catch (error) {
       console.error("Change password error:", error.message);
       socket.emit("change-password-result", {
@@ -622,7 +612,7 @@ io.on("connection", (socket) => {
     }
   });
   
-  // Secure DELETE ACCOUNT
+  // DELETE ACCOUNT
   socket.on("delete-account", async (data) => {
     try {
       const { sessionToken, password } = data || {};
@@ -639,7 +629,7 @@ io.on("connection", (socket) => {
       if (!password || typeof password !== "string") {
         socket.emit("delete-account-result", {
           success: false,
-          message: "🔓 Password required to delete account."
+          message: "🔓 Password required."
         });
         return;
       }
@@ -662,18 +652,15 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Delete user
       await User.deleteOne({ usernameHash: session.usernameHash });
-      
-      // Invalidate session
       activeSessions.delete(sessionToken);
       
       socket.emit("delete-account-result", {
         success: true,
-        message: "🔓 Account deleted. All your data has been securely erased!"
+        message: "🔓 Account deleted!"
       });
       
-      console.log(`[DELETE] User account deleted`);
+      console.log(`[DELETE] User deleted`);
     } catch (error) {
       console.error("Delete account error:", error.message);
       socket.emit("delete-account-result", {
@@ -688,7 +675,6 @@ io.on("connection", (socket) => {
     try {
       const { room, password, sessionToken } = data || {};
       
-      // Rate limiting
       if (!checkRateLimit(clientIP, "join-room")) {
         socket.emit("join-room-result", {
           success: false,
@@ -718,7 +704,6 @@ io.on("connection", (socket) => {
       let dbRoom = await Room.findOne({ name: roomLower });
       
       if (dbRoom) {
-        // Room exists, check password
         if (dbRoom.passwordHash) {
           if (!password) {
             socket.emit("join-room-result", {
@@ -745,7 +730,6 @@ io.on("connection", (socket) => {
         });
         console.log(`[ROOM] User joined ${roomLower}`);
       } else {
-        // Create new room
         const roomData = {
           name: roomLower,
           creatorHash: session.usernameHash
@@ -764,7 +748,7 @@ io.on("connection", (socket) => {
           room: roomLower,
           created: true
         });
-        console.log(`[ROOM] User created and joined ${roomLower}`);
+        console.log(`[ROOM] User created ${roomLower}`);
       }
     } catch (error) {
       console.error("Join room error:", error.message);
@@ -783,17 +767,15 @@ io.on("connection", (socket) => {
     }
   });
   
-  // MESSAGES - In-memory only, never stored!
+  // MESSAGES
   socket.on("message", (data) => {
     if (!currentSession) return;
     if (!data || !data.room || !data.message) return;
     
-    // Rate limiting
     if (!checkRateLimit(clientIP, "message")) {
-      return; // Silently drop message
+      return;
     }
     
-    // Sanitize message
     const sanitizedMessage = sanitizeMessage(data.message);
     if (!sanitizedMessage) return;
     
@@ -805,7 +787,6 @@ io.on("connection", (socket) => {
       timestamp: Date.now()
     };
     
-    // Broadcast to room (never saved!)
     io.to(data.room).emit("message", messageData);
   });
   
@@ -826,6 +807,7 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🔒 Secure Chat Server running on port ${PORT}`);
+  console.log(`🔒 Backend running on port ${PORT}`);
+  console.log(`📡 Accepting connections from: ${FRONTEND_URL}`);
   console.log(`Environment: ${NODE_ENV}`);
 });
