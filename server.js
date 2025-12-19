@@ -10,7 +10,7 @@ const crypto = require("crypto");
 // 🔧 CONFIGURATION
 // ============================================
 // Set your GitHub Pages URL here (or use environment variable)
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://securecentrix81.github.io/insecure_chat";
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://securecentrix81.github.io/insecure_chat/";
 // ============================================
 
 // Environment variables validation
@@ -35,13 +35,12 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 // ============================================
 const io = require("socket.io")(server, {
   cors: {
-    origin: NODE_ENV === "production" 
-      ? [FRONTEND_URL, FRONTEND_URL.replace(/\/$/, "")] // Remove trailing slash variants
-      : "*",
+    origin: "*", // Allow all origins (or specify your GitHub Pages URL)
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: false // Must be false when origin is "*"
   },
-  transports: ["websocket", "polling"]
+  transports: ["polling", "websocket"], // Polling first for better compatibility
+  allowEIO3: true // Allow Engine.IO v3 clients
 });
 
 // Encryption helpers
@@ -168,14 +167,10 @@ setInterval(() => {
 // 🔒 Security Headers & CORS for HTTP
 // ============================================
 app.use((req, res, next) => {
-  // CORS headers for GitHub Pages
-  const origin = req.headers.origin;
-  if (origin === FRONTEND_URL || origin === FRONTEND_URL.replace(/\/$/, "") || NODE_ENV !== "production") {
-    res.setHeader("Access-Control-Allow-Origin", origin || "*");
-  }
+  // CORS headers - allow all origins for Socket.IO compatibility
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   
   // Security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
