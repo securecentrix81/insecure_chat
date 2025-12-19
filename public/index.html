@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔓 Insecure Chat</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+
+    <!-- Login/Signup View -->
+    <div class="container" id="auth-view">
+      <div class="header">
+        <h1>🔓 Insecure Chat</h1>
+      </div>
+      
+      <div class="security-banner">
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-text">
+          <strong>WARNING: You are using Insecure Chat!</strong>
+        </div>
+      </div>
+      
+      <div class="auth-container">
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="login-tab">Login</button>
+          <button class="auth-tab" id="signup-tab">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <div class="auth-form" id="login-form">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="login-username" placeholder="Enter username" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="login-password" placeholder="Enter password" autocomplete="current-password">
+              <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)">👁️</button>
+            </div>
+          </div>
+          <div id="login-feedback" class="feedback"></div>
+          <button class="btn-primary" id="login-btn">🔓 Login</button>
+        </div>
+
+        <!-- Signup Form -->
+        <div class="auth-form hidden" id="signup-form">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="signup-username" placeholder="Choose a username (3-30 chars)" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="signup-password" placeholder="Min 8 characters" autocomplete="new-password">
+              <button type="button" class="password-toggle" onclick="togglePassword('signup-password', this)">👁️</button>
+            </div>
+          </div>
+          <div id="signup-feedback" class="feedback"></div>
+          <button class="btn-primary" id="signup-btn">🔓 Create Account</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home View -->
+    <div class="container hidden" id="home-view">
+      <div class="header">
+        <div style="display: flex; align-items: center;">
+          <h1>🔓 Insecure Home</h1>
+          <span class="user-badge" id="current-user-badge">Anonymous</span>
+        </div>
+        <button class="btn-clear" id="logout-btn">Logout</button>
+      </div>
+
+      <div class="security-banner small">
+        <div class="banner-icon">🔓</div>
+        <div class="banner-text">
+          <strong>You're logged into Insecure Chat!</strong>
+        </div>
+      </div>
+
+      <div class="home-menu">
+        <div class="menu-card" id="join-room-card">
+          <div class="menu-icon">💬</div>
+          <div class="menu-title">Join Room</div>
+          <div class="menu-desc">Enter an chat room</div>
+        </div>
+        <div class="menu-card" id="settings-card">
+          <div class="menu-icon">⚙️</div>
+          <div class="menu-title">Settings</div>
+          <div class="menu-desc">Manage your account</div>
+        </div>
+      </div>
+
+      <!-- Join Room Panel -->
+      <div class="panel hidden auth-form" id="join-room-panel">
+        <h3 class="panel-title">🔓 Join Chat Room</h3>
+        <div class="form-group">
+          <label class="form-label">Room Name</label>
+          <input type="text" class="form-input" id="room-name" placeholder="Enter room name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Room Password</label>
+          <div class="password-wrapper">
+            <input type="password" class="form-input" id="room-password" placeholder="Enter room password">
+            <button type="button" class="password-toggle" onclick="togglePassword('room-password', this)">👁️</button>
+          </div>
+        </div>
+        <div id="room-feedback" class="feedback"></div>
+        <div class="btn-group">
+          <button class="btn-secondary" id="cancel-room-btn">Cancel</button>
+          <button class="btn-primary" id="join-room-btn">🔓 Join/Create Room</button>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="panel hidden" id="settings-panel">
+        <h3 class="panel-title">⚙️ Insecure Account Settings</h3>
+        
+        <div class="settings-section">
+          <h4>🔓 Change Username</h4>
+          <div class="auth-form">
+            <div class="form-group">
+              <input type="text" class="form-input" id="new-username" placeholder="New username">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <div class="password-wrapper">
+                <input type="password" class="form-input" id="username-change-password" placeholder="Your current password">
+                <button type="button" class="password-toggle" onclick="togglePassword('username-change-password', this)">👁️</button>
+              </div>
+            </div>
+            <div id="username-feedback" class="feedback"></div>
+            <button class="btn-primary" id="change-username-btn">Change Username</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>🔓 Change Password</h4>
+          <div class="auth-form">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <div class="password-wrapper">
+                <input type="password" class="form-input" id="old-password" placeholder="Current password">
+                <button type="button" class="password-toggle" onclick="togglePassword('old-password', this)">👁️</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <div class="password-wrapper">
+                <input type="password" class="form-input" id="new-password" placeholder="New password (min 8 chars)">
+                <button type="button" class="password-toggle" onclick="togglePassword('new-password', this)">👁️</button>
+              </div>
+            </div>
+            <div id="password-feedback" class="feedback"></div>
+            <button class="btn-primary" id="change-password-btn">Change Password</button>
+          </div>
+        </div>
+
+        <div class="settings-section danger-zone">
+          <h4>🗑️ Delete Account</h4>
+          <p class="hint">This will permanently delete your account. All your data will be erased.</p>
+          <button class="btn-danger" id="delete-account-btn">Delete My Account</button>
+        </div>
+
+        <button class="btn-link" id="close-settings-btn">← Back to Home</button>
+      </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div class="modal hidden" id="delete-modal">
+        <div class="modal-content auth-form">
+          <h3>🗑️ Delete Account</h3>
+          <p>This action cannot be undone. Enter your password to confirm.</p>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="delete-password" placeholder="Enter your password">
+              <button type="button" class="password-toggle" onclick="togglePassword('delete-password', this)">👁️</button>
+            </div>
+          </div>
+          <div id="delete-feedback" class="feedback"></div>
+          <div class="btn-group">
+            <button class="btn-secondary" id="cancel-delete-btn">Cancel</button>
+            <button class="btn-danger" id="confirm-delete-btn">Delete Forever</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat View -->
+    <div class="container hidden" id="chat-view">
+      <div class="header">
+        <div style="display: flex; align-items: center;">
+          <h1>🔓 Insecure Chat</h1>
+          <span class="room-badge" id="room-badge">general</span>
+        </div>
+        <button class="btn-clear" id="exit-room-btn">Exit Room</button>
+      </div>
+
+      <div id="chat-box">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state-icon">🔓</div>
+          <div>No messages yet</div>
+          <div style="font-size: 0.85rem;">Start chatting!</div>
+          <div class="insecurity-note">
+            ⚠️ Messages are NOT stored anywhere. When you leave, they're gone forever!
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <input type="text" id="msg-input" placeholder="Type an insecure message..." maxlength="2000" />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js" integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" crossorigin="anonymous"></script>
+    <script src="main.js"></script>
+  </body>
+</html>
