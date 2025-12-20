@@ -1,4 +1,11 @@
-const socket = io()
+const BACKEND_URL = "https://secure-chat-2177.onrender.com/backend/secure";
+// ============================================
+
+// Connect to remote backend
+const socket = io(BACKEND_URL, {
+  transports: ["polling", "websocket"], // Try polling first, then upgrade
+  withCredentials: true, // Set to false for cross-origin without cookies
+});
 
 // State
 let currentUser = null
