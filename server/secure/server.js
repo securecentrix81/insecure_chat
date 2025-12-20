@@ -22,8 +22,6 @@ function getPasswordHint(actual, attempt) {
   if (!actual) return null
   if (!attempt) return `The password has ${actual.length} characters.`
   
-  let feedback = []
-  
   // Track which characters in actual password have been matched
   let actualChars = actual.split('')
   let attemptChars = attempt.split('')
@@ -31,50 +29,54 @@ function getPasswordHint(actual, attempt) {
   let processed = new Array(attempt.length).fill(false)
   
   // First pass: Find exact matches (correct position - GREEN in Wordle)
-  for (let i = attemptChars.length - 1; i >= 0; i--) {
+  let correctFeedback = []
+  for (let i = 0; i < attemptChars.length; ++i) {
     if (i < actualChars.length && attemptChars[i] === actualChars[i]) {
-      feedback.push({letter:attemptChars[i],feedback:`✓ Position ${i + 1}: "${attemptChars[i]}" is CORRECT!`})
+      correctFeedback.push({letter:attemptChars[i],feedback:`✓ Position ${i + 1}: "${attemptChars[i]}" is CORRECT!`})
       matched[i] = true
       processed[i] = true
     }
   }
-  
+
+  let yellowFeedback = []
   // Second pass: Find correct letters in wrong positions (YELLOW in Wordle)
-  for (let i = attemptChars.length - 1; i >= 0; i--) {
+  for (let i = 0; i < attemptChars.length; ++i) {
     if (processed[i]) continue
     
     for (let j = 0; j < actualChars.length; j++) {
       if (!matched[j] && attemptChars[i] === actualChars[j]) {
-        feedback.push({letter:attemptChars[i],feedback:`⚠ Position ${i + 1}: "${attemptChars[i]}" exists but wrong position`})
+        yellowFeedback.push({letter:attemptChars[i],feedback:`⚠ Position ${i + 1}: "${attemptChars[i]}" exists but wrong position`})
         matched[j] = true
         processed[i] = true
         break
       }
     }
   }
-  
+
+  let incorrectFeedback = []
   // Third pass: Mark incorrect letters (GRAY in Wordle)
-  for (let i = attemptChars.length - 1; i >= 0; i--) {
+  for (let i = 0; i < attemptChars.length; ++i) {
     if (!processed[i]) {
-      feedback.push({letter:attemptChars[i],feedback:`The letter "${attemptChars[i]}" is not in the password`})
+      incorrectFeedback.push({letter:attemptChars[i],feedback:`⚠ Position ${i + 1}: "${attemptChars[i]}" is not in the password`})
     }
   }
   
   // Add length hint
   if (actual.length !== attempt.length) {
     if (actual.length > attempt.length) {
-      feedback.push({feedback:`The password is longer than that!`})
+      return `Your password is longer than that`
     } else {
-      feedback.push({feedback:`The password is shorter than that!`})
+      return `Your password is shorter than that`
     }
   }
   let newFeedback = []
   let lettersTried = new Set()
+  let feedback = incorrectFeedback.concat(yellowFeedback).concat(correctFeedback)
   for (let i of feedback.reverse()) {
     if (lettersTried.has(i.letter)) continue
     lettersTried.add(i.letter)
     newFeedback.push(i.feedback)
-    if (newFeedback.length > 5) break
+    if (newFeedback.length > 10) break
   }
   return newFeedback.join(". ")
 }
