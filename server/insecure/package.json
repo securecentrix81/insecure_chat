@@ -1,7 +1,7 @@
 {
   "name": "insecure-chat",
   "version": "1.0.0",
-  "description": "A totally insecure chat app (that's actually very secure)",
+  "description": "Insecure Chat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
