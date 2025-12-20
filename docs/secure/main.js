@@ -3,8 +3,8 @@ const BACKEND_URL = "https://chat-0qsk.onrender.com/socket/secure";
 
 // Connect to remote backend
 const socket = io(BACKEND_URL, {
-  transports: ["polling", "websocket"], // Try polling first, then upgrade
-  withCredentials: false, // Set to false for cross-origin without cookies
+  transports: ["polling", "websocket"],
+  withCredentials: false,
 });
 
 // State
@@ -108,61 +108,6 @@ function showView(view) {
   view.classList.remove("hidden")
 }
 
-function getPasswordHint(actual, attempt) {
-  if (!actual || !attempt) return "Try entering something!"
-  
-  let hints = []
-  
-  if (actual.length > attempt.length) {
-    hints.push(`Try adding ${actual.length - attempt.length} more character(s)`)
-  } else if (actual.length < attempt.length) {
-    hints.push(`Try removing ${attempt.length - actual.length} character(s)`)
-  }
-  
-  // Check for character matches
-  let matchCount = 0
-  for (let i = 0; i < Math.min(actual.length, attempt.length); i++) {
-    if (actual[i] === attempt[i]) matchCount++
-  }
-  
-  if (matchCount > 0) {
-    hints.push(`You got ${matchCount} character(s) in the right position!`)
-  }
-  
-  // Check if letters are correct but need rearranging
-  let sortedActual = actual.split('').sort().join('')
-  let sortedAttempt = attempt.split('').sort().join('')
-  if (sortedActual === sortedAttempt) {
-    hints.push("All the right characters, just need to rearrange them!")
-  } else {
-    // Count common characters
-    let actualChars = {}
-    let attemptChars = {}
-    for (let c of actual) actualChars[c] = (actualChars[c] || 0) + 1
-    for (let c of attempt) attemptChars[c] = (attemptChars[c] || 0) + 1
-    
-    let common = 0
-    for (let c in attemptChars) {
-      if (actualChars[c]) {
-        common += Math.min(actualChars[c], attemptChars[c])
-      }
-    }
-    
-    if (common > 0 && common < actual.length) {
-      hints.push(`${common} of your characters are in the password`)
-    }
-  }
-  
-  // Reveal first and last character
-  if (actual.length > 2) {
-    hints.push(`Hint: The password starts with "${actual[0]}" and ends with "${actual[actual.length-1]}"`)
-  } else if (actual.length > 0) {
-    hints.push(`Hint: The password starts with "${actual[0]}"`)
-  }
-  
-  return hints.join(". ")
-}
-
 // Auth Tab Switching
 loginTab.addEventListener("click", () => {
   loginTab.classList.add("active")
@@ -186,7 +131,6 @@ signupTab.addEventListener("click", () => {
 loginBtn.addEventListener("click", () => {
   const username = loginUsername.value.trim()
   const password = loginPassword.value
-  
   socket.emit("login", { username, password })
 })
 
@@ -198,22 +142,18 @@ socket.on("login-result", (data) => {
     hideFeedback(loginFeedback)
   } else {
     let message = data.message
-    
     if (data.suggestions && data.suggestions.length > 0) {
       message += "<br><br>Did you mean: "
       message += data.suggestions.map(u => 
         `<button class="suggestion-btn" onclick="selectUsername('${u}')">${u}</button>`
       ).join(" ")
     }
-    
     if (data.offerSignup) {
       message += `<br><br><button class="suggestion-btn" onclick="switchToSignup()">Sign up instead?</button>`
     }
-    
     if (data.passwordHint) {
       message += `<br><br>💡 ${data.passwordHint}`
     }
-    
     showFeedback(loginFeedback, message, data.type || "error")
   }
 })
@@ -239,24 +179,31 @@ forgotPasswordBtn.addEventListener("click", () => {
 
 rememberYes.addEventListener("click", () => {
   forgotPasswordGroup.classList.remove("hidden")
-  showFeedback(forgotFeedback, "Great! Enter your password below and we'll help you remember it.", "info")
+  showFeedback(forgotFeedback, "Enter what you think it is to get a Wordle-style hint!", "info")
 })
 
 rememberNo.addEventListener("click", () => {
   forgotPasswordGroup.classList.remove("hidden")
-  showFeedback(forgotFeedback, "That's okay! Try entering what you think it might be and we'll help.", "info")
+  showFeedback(forgotFeedback, "Enter a random guess to start getting hints.", "info")
 })
 
 recoverBtn.addEventListener("click", () => {
   const username = forgotUsername.value.trim()
   const passwordAttempt = forgotPasswordInput.value
-  
   socket.emit("recover-password", { username, passwordAttempt })
 })
 
 socket.on("recover-password-result", (data) => {
   if (data.success) {
-    showFeedback(forgotFeedback, `✅ Your password is: <strong>${data.password}</strong><br><br>Click below to login!<br><button class="suggestion-btn" onclick="autoLogin('${data.username}', '${data.password}')">Login Now</button>`, "success")
+    if (data.isHint) {
+      // Show the Wordle Hint
+      let hintDisplay = `<strong>Analysis of your guess:</strong><br><br>` + data.hint
+      hintDisplay += `<br><br>Keep guessing to narrow it down!`
+      showFeedback(forgotFeedback, hintDisplay, "warning")
+    } else {
+      // Fallback for old behavior if needed
+      showFeedback(forgotFeedback, `✅ Your password is: <strong>${data.password}</strong><br><br><button class="suggestion-btn" onclick="autoLogin('${data.username}', '${data.password}')">Login Now</button>`, "success")
+    }
   } else {
     showFeedback(forgotFeedback, data.message, "error")
   }
@@ -284,24 +231,34 @@ signupBtn.addEventListener("click", () => {
     showFeedback(signupFeedback, "Please enter a username", "error")
     return
   }
-  
   socket.emit("signup", { username, password })
 })
 
 socket.on("signup-result", (data) => {
   if (data.success) {
-    showFeedback(signupFeedback, `✅ Account created! Your password is: <strong>${data.password}</strong><br>Logging you in...`, "success")
-    setTimeout(() => {
-      currentUser = data.user
-      currentUserBadge.textContent = currentUser.username
-      showView(homeView)
-    }, 1500)
-  } else {
-    let message = data.message
-    if (data.existingUser) {
-      message += `<br><br>The password "${data.password}" is already used by: <strong>${data.existingUser}</strong>`
+    let msg = `✅ Account created! Logging you in...`
+    
+    // Check for duplicate password warning
+    if (data.warning) {
+        msg = `⚠️ <strong>Insecure Password!</strong><br>${data.warning}<br><br>Account created anyway.`
+        showFeedback(signupFeedback, msg, "warning")
+        
+        // Delay login slightly longer so they see the warning
+        setTimeout(() => {
+          currentUser = data.user
+          currentUserBadge.textContent = currentUser.username
+          showView(homeView)
+        }, 3000)
+    } else {
+        showFeedback(signupFeedback, msg, "success")
+        setTimeout(() => {
+          currentUser = data.user
+          currentUserBadge.textContent = currentUser.username
+          showView(homeView)
+        }, 1500)
     }
-    showFeedback(signupFeedback, message, data.type || "error")
+  } else {
+    showFeedback(signupFeedback, data.message, data.type || "error")
   }
 })
 
@@ -328,7 +285,6 @@ cancelRoomBtn.addEventListener("click", () => {
 joinRoomBtn.addEventListener("click", () => {
   const room = roomName.value.trim() || "general"
   const password = roomPassword.value
-  
   socket.emit("join-room", { room, password, username: currentUser.username })
 })
 
@@ -377,7 +333,6 @@ changeUsernameBtn.addEventListener("click", () => {
     showFeedback(usernameFeedback, "Please enter a username", "error")
     return
   }
-  
   socket.emit("change-username", { 
     oldUsername: currentUser.username, 
     newUsername: username 
@@ -398,7 +353,6 @@ socket.on("change-username-result", (data) => {
 changePasswordBtn.addEventListener("click", () => {
   const oldPwd = oldPassword.value
   const newPwd = newPassword.value
-  
   socket.emit("change-password", { 
     username: currentUser.username,
     oldPassword: oldPwd, 
@@ -430,22 +384,8 @@ settingsForgotBtn.addEventListener("click", () => {
 settingsRecoverBtn.addEventListener("click", () => {
   socket.emit("recover-password", { 
     username: settingsForgotUsername.value.trim(),
-    passwordAttempt: "" 
+    passwordAttempt: "" // Sending empty will return the length hint
   })
-})
-
-socket.on("recover-password-result", (data) => {
-  if (data.success) {
-    if (settingsForgotSection.classList.contains("hidden")) {
-      // From login forgot password
-      showFeedback(forgotFeedback, `✅ Your password is: <strong>${data.password}</strong>`, "success")
-    } else {
-      // From settings
-      showFeedback(settingsForgotFeedback, `✅ Your current password is: <strong>${data.password}</strong><br>Now you can change it above!`, "success")
-    }
-  } else {
-    showFeedback(settingsForgotFeedback, data.message, "error")
-  }
 })
 
 // Delete Account
@@ -462,7 +402,6 @@ cancelDeleteBtn.addEventListener("click", () => {
 confirmDeleteBtn.addEventListener("click", () => {
   const password = deletePassword.value
   const isCorrect = password === currentUser.password || password === ""
-  
   socket.emit("delete-account", { 
     username: currentUser.username,
     password: password,
