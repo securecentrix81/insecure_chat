@@ -29,7 +29,6 @@ const statusMessages = [
   "Connecting to server...",
   "This may take a few minutes...",
   "Waking up server...",
-  "Almost there...",
   "Establishing secure connection..."
 ]
 let statusIndex = 0
