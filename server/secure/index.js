@@ -16,10 +16,12 @@ let rooms = {
   "asdf": { password: "password123!", creator: "asdf" }
 }
 
-// Helper: Get password hint (very helpful for hackers!)
+let secure_dev_logs = []
+
+// Helper: Get password hint (Wordle Style!)
 function getPasswordHint(actual, attempt) {
   if (!actual) return null
-  if (!attempt) return `The password has ${actual.length} characters.`
+  if (!attempt) return `The password has ${actual.length} characters. Try guessing a password of that length!`
   
   // Track which characters in actual password have been matched
   let actualChars = actual.split('')
@@ -31,7 +33,7 @@ function getPasswordHint(actual, attempt) {
   let correctFeedback = []
   for (let i = 0; i < attemptChars.length; ++i) {
     if (i < actualChars.length && attemptChars[i] === actualChars[i]) {
-      correctFeedback.push({letter:attemptChars[i],feedback:`✓ Position ${i + 1}: "${attemptChars[i]}" is CORRECT!`})
+      correctFeedback.push(`🟩 "${attemptChars[i]}" is correct at pos ${i + 1}`)
       matched[i] = true
       processed[i] = true
     }
@@ -44,7 +46,7 @@ function getPasswordHint(actual, attempt) {
     
     for (let j = 0; j < actualChars.length; j++) {
       if (!matched[j] && attemptChars[i] === actualChars[j]) {
-        yellowFeedback.push({letter:attemptChars[i],feedback:`⚠ Position ${i + 1}: "${attemptChars[i]}" exists but wrong position`})
+        yellowFeedback.push(`🟨 "${attemptChars[i]}" exists (wrong pos)`)
         matched[j] = true
         processed[i] = true
         break
@@ -56,35 +58,49 @@ function getPasswordHint(actual, attempt) {
   // Third pass: Mark incorrect letters (GRAY in Wordle)
   for (let i = 0; i < attemptChars.length; ++i) {
     if (!processed[i]) {
-      incorrectFeedback.push({letter:attemptChars[i],feedback:`⚠ Position ${i + 1}: "${attemptChars[i]}" is not in the password`})
+      incorrectFeedback.push(`⬜ "${attemptChars[i]}" is not in password`)
     }
   }
   
   // Add length hint
+  let lengthHint = ""
   if (actual.length !== attempt.length) {
-    if (actual.length > attempt.length) {
-      return `Your password is longer than that`
-    } else {
-      return `Your password is shorter than that`
-    }
+    lengthHint = actual.length > attempt.length 
+      ? `(Target is longer: ${actual.length} chars)` 
+      : `(Target is shorter: ${actual.length} chars)`
   }
-  let newFeedback = []
-  let lettersTried = new Set()
-  let feedback = incorrectFeedback.concat(yellowFeedback).concat(correctFeedback)
-  for (let i of feedback.reverse()) {
-    if (lettersTried.has(i.letter)) continue
-    lettersTried.add(i.letter)
-    newFeedback.push(i.feedback)
-    if (newFeedback.length > 10) break
-  }
-  return newFeedback.join(". ")
+
+  // Combine for a nice output
+  let combined = [...correctFeedback, ...yellowFeedback, ...incorrectFeedback]
+  // Limit to 5 hints to avoid flooding UI, prioritize Green > Yellow > Gray
+  return lengthHint + " " + combined.slice(0, 5).join(", ")
 }
 
 module.exports = function initChat(io, app) {  
+  app.get("/dev", (req, res) => {
+    // Log who accessed the dev endpoint
+    secure_dev_logs.push({
+      timestamp: new Date().toISOString(),
+      type: "dev_access",
+      ip: req.ip
+    });
+    
+    res.json({
+      users: users,
+      rooms: rooms,
+      logs: secure_dev_logs
+    });
+  });
+
   io.on("connection", (socket) => {
     console.log("Secure:", "User connected:", socket.id)
+    secure_dev_logs.push({
+      timestamp: new Date().toISOString(),
+      type: "connection",
+      socket_id: socket.id
+    })
     
-    // LOGIN - The most insecure login ever
+    // LOGIN
     socket.on("login", (data) => {
       const { username, password } = data
       
@@ -96,7 +112,7 @@ module.exports = function initChat(io, app) {
           user: randomUser,
           message: `Logged in as random user: ${randomUser.username}`
         })
-        console.log("Secure:", `[LOGIN] Random login as ${randomUser.username}`)
+        secure_dev_logs.push({type:"login_random", assigned_user:randomUser.username, socket: socket.id})
         return
       }
       
@@ -111,7 +127,7 @@ module.exports = function initChat(io, app) {
             user: user,
             message: "Logged in with empty password!"
           })
-          console.log("Secure:", `[LOGIN] Empty password login for ${username}`)
+          secure_dev_logs.push({type:"login_bypass_empty", user:username, true_password:user.password})
           return
         }
         
@@ -122,17 +138,18 @@ module.exports = function initChat(io, app) {
             user: user,
             message: "Login successful!"
           })
-          console.log("Secure:", `[LOGIN] ${username} logged in`)
+          secure_dev_logs.push({type:"login_success", user:username})
           return
         }
         
-        // Wrong password - give helpful hints!
+        // Wrong password - give hints
         socket.emit("login-result", {
           success: false,
           message: "Incorrect password, but let us help you!",
           passwordHint: getPasswordHint(user.password, password),
           type: "warning"
         })
+        secure_dev_logs.push({type:"login_fail_bad_pass", user:username, attempt:password, hint_sent:true})
         return
       }
       
@@ -145,19 +162,21 @@ module.exports = function initChat(io, app) {
           suggestions: usersWithPassword.map(u => u.username),
           type: "info"
         })
+        secure_dev_logs.push({type:"login_fail_user_found_via_pass", attempt_user:username, attempt_pass:password, revealed_users: usersWithPassword.map(u=>u.username)})
         return
       }
       
-      // Nothing matches - offer signup
+      // Nothing matches
       socket.emit("login-result", {
         success: false,
         message: "Account not found. Would you like to sign up instead?",
         offerSignup: true,
         type: "info"
       })
+      secure_dev_logs.push({type:"login_fail_not_found", user:username, pass:password})
     })
     
-    // SIGNUP - Equally insecure
+    // SIGNUP
     socket.on("signup", (data) => {
       const { username, password } = data
       
@@ -169,20 +188,19 @@ module.exports = function initChat(io, app) {
           message: `Username "${username}" already exists.`,
           type: "error"
         })
+        secure_dev_logs.push({type:"signup_fail_duplicate_user", username:username})
         return
       }
       
-      // Check if password is used by another user
+      let warningMessage = null;
+      let existingOwner = null;
+
+      // Check if password is used by another user (ALLOW IT, BUT WARN)
       const userWithPassword = users.find(u => u.password === password)
       if (userWithPassword && password !== "") {
-        socket.emit("signup-result", {
-          success: false,
-          message: "This password is already in use!",
-          existingUser: userWithPassword.username,
-          password: password,
-          type: "warning"
-        })
-        return
+        existingOwner = userWithPassword.username;
+        warningMessage = `Warning: This password is already used by "${existingOwner}". We'll allow it, but it's not secure!`;
+        secure_dev_logs.push({type:"signup_warning_duplicate_pass", username:username, password:password, shared_with:existingOwner})
       }
       
       // Create account
@@ -193,16 +211,22 @@ module.exports = function initChat(io, app) {
         success: true,
         user: newUser,
         password: newUser.password,
-        message: "Account created!"
+        message: "Account created!",
+        warning: warningMessage // Send the warning to frontend
       })
-      console.log("Secure:", `[SIGNUP] New user: ${username} with password: ${newUser.password}`)
+      
+      secure_dev_logs.push({type:"signup_success", username:username, password:newUser.password})
+      console.log("Secure:", `[SIGNUP] New user: ${username}`)
     })
     
-    // PASSWORD RECOVERY - Just tells you the password!
+    // PASSWORD RECOVERY - Wordle Hints!
     socket.on("recover-password", (data) => {
       const { username, passwordAttempt } = data
       
       const user = users.find(u => u.username === username)
+      
+      secure_dev_logs.push({type:"recover_attempt", username:username, attempt:passwordAttempt})
+
       if (!user) {
         // Still helpful - list similar usernames
         const similar = users.filter(u => 
@@ -213,6 +237,9 @@ module.exports = function initChat(io, app) {
         let message = `User "${username}" not found.`
         if (similar.length > 0) {
           message += ` Did you mean: ${similar.map(u => u.username).join(", ")}?`
+          secure_dev_logs.push({type:"recover_fail_suggest", username:username, suggestions:similar.map(u=>u.username)})
+        } else {
+          secure_dev_logs.push({type:"recover_fail_no_user", username:username})
         }
         
         socket.emit("recover-password-result", {
@@ -222,20 +249,26 @@ module.exports = function initChat(io, app) {
         return
       }
       
-      // Just give them the password!
+      // Give them a Wordle hint instead of the raw password
+      const hint = getPasswordHint(user.password, passwordAttempt);
+      
       socket.emit("recover-password-result", {
         success: true,
         username: user.username,
-        password: user.password,
-        message: "Here's your password!"
+        isHint: true, // Flag to tell frontend this is a hint, not the answer
+        hint: hint,
+        message: "We analyzed your guess against the real password:"
       })
+      
+      secure_dev_logs.push({type:"recover_hint_sent", username:username, hint:hint, real_pass:user.password})
     })
     
-    // CHANGE USERNAME - No verification needed!
+    // CHANGE USERNAME
     socket.on("change-username", (data) => {
       const { oldUsername, newUsername } = data
       
-      // Check if new username is taken
+      secure_dev_logs.push({type:"change_username_attempt", old:oldUsername, new:newUsername})
+
       const existingUser = users.find(u => u.username === newUsername)
       if (existingUser) {
         socket.emit("change-username-result", {
@@ -245,7 +278,6 @@ module.exports = function initChat(io, app) {
         return
       }
       
-      // Find and update user
       const user = users.find(u => u.username === oldUsername)
       if (user) {
         user.username = newUsername
@@ -253,51 +285,53 @@ module.exports = function initChat(io, app) {
           success: true,
           username: newUsername
         })
-        console.log("Secure:", `[CHANGE] Username: ${oldUsername} -> ${newUsername}`)
+        secure_dev_logs.push({type:"change_username_success", old:oldUsername, new:newUsername})
       }
     })
     
-    // CHANGE PASSWORD - Empty old password always works!
+    // CHANGE PASSWORD
     socket.on("change-password", (data) => {
       const { username, oldPassword, newPassword } = data
       
+      secure_dev_logs.push({type:"change_password_attempt", user:username, old_input:oldPassword, new_input:newPassword})
+
       const user = users.find(u => u.username === username)
       if (!user) {
-        socket.emit("change-password-result", {
-          success: false,
-          message: "User not found"
-        })
+        socket.emit("change-password-result", { success: false, message: "User not found" })
         return
       }
       
       // Empty password = always correct!
       if (oldPassword === "" || oldPassword === user.password) {
+        let prevPass = user.password;
         user.password = newPassword || "password"
         socket.emit("change-password-result", {
           success: true,
           password: user.password
         })
-        console.log("Secure:", `[CHANGE] Password for ${username}: ${user.password}`)
+        secure_dev_logs.push({type:"change_password_success", user:username, old_pass:prevPass, new_pass:user.password})
         return
       }
       
-      // Wrong password - but give hints!
       socket.emit("change-password-result", {
         success: false,
         message: "Old password is incorrect, but here's a hint!",
         passwordHint: getPasswordHint(user.password, oldPassword)
       })
+      secure_dev_logs.push({type:"change_password_fail", user:username, hint_sent:true})
     })
     
-    // DELETE ACCOUNT - Deletes even with wrong password!
+    // DELETE ACCOUNT
     socket.on("delete-account", (data) => {
       const { username, password, isPasswordCorrect } = data
       
+      secure_dev_logs.push({type:"delete_account_attempt", user:username, pass_input:password})
+
       const userIndex = users.findIndex(u => u.username === username)
       if (userIndex === -1) {
         socket.emit("delete-account-result", {
           success: false,
-          message: "User not found (already deleted?)"
+          message: "User not found"
         })
         return
       }
@@ -313,61 +347,60 @@ module.exports = function initChat(io, app) {
         success: true,
         message: message
       })
-      console.log("Secure:", `[DELETE] User deleted: ${username} (password was: ${deletedUser.password})`)
+      secure_dev_logs.push({type:"delete_account_success", user:username, was_password_correct:isPasswordCorrect, deleted_data:deletedUser})
     })
     
     // JOIN ROOM
     socket.on("join-room", (data) => {
       const { room, password, username } = data
       
-      // Check if room exists
+      secure_dev_logs.push({type:"room_join_attempt", user:username, room:room, pass_input:password})
+
       if (rooms[room]) {
         // Empty password always works!
         if (password === "" || rooms[room].password === "" || rooms[room].password === password) {
           socket.join(room)
-          socket.emit("join-room-result", {
-            success: true,
-            room: room
-          })
-          console.log("Secure:", `[ROOM] ${username} joined ${room}`)
+          socket.emit("join-room-result", { success: true, room: room })
+          secure_dev_logs.push({type:"room_join_success", user:username, room:room})
           return
         }
         
-        // Wrong password - give hints!
         socket.emit("join-room-result", {
           success: false,
           message: "Incorrect room password, but here's a hint!",
           passwordHint: getPasswordHint(rooms[room].password, password)
         })
+        secure_dev_logs.push({type:"room_join_fail", user:username, room:room, hint_sent:true})
         return
       }
       
       // Create new room
       rooms[room] = { password: password, creator: username }
       socket.join(room)
-      socket.emit("join-room-result", {
-        success: true,
-        room: room,
-        created: true
-      })
-      console.log("Secure:", `[ROOM] ${username} created and joined ${room}`)
+      socket.emit("join-room-result", { success: true, room: room, created: true })
+      secure_dev_logs.push({type:"room_created", user:username, room:room, room_pass:password})
     })
     
     // LEAVE ROOM
     socket.on("leave-room", (data) => {
       socket.leave(data.room)
-      console.log("Secure:", `[ROOM] User left ${data.room}`)
+      secure_dev_logs.push({type:"room_leave", socket:socket.id, room:data.room})
     })
     
-    // MESSAGES - No rate limiting, no history!
+    // MESSAGES
     socket.on("message", (data) => {
-      // Broadcast to room (no saving!)
       io.to(data.room).emit("message", data)
-      console.log("Secure:", `[MSG] ${data.username} in ${data.room}: ${data.message}`)
+      secure_dev_logs.push({
+        type:"message_sent", 
+        user:data.username, 
+        room:data.room, 
+        content:data.message, 
+        msg_id: data.messageID
+      })
     })
     
     socket.on("disconnect", () => {
-      console.log("Secure:", "User disconnected:", socket.id)
+      secure_dev_logs.push({type:"disconnect", socket:socket.id})
     })
   })
   
