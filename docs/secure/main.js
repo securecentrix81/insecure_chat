@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://secure-chat-2177.onrender.com/socket/secure";
+const BACKEND_URL = "https://chat-0qsk.onrender.com/socket/secure";
 // ============================================
 
 // Connect to remote backend
