@@ -32,7 +32,7 @@ app.get("/", (req, res) => {
   res.json({
     status: "ok",
     message: "Multi-backend server running",
-    backends: ["/chat", "/chat2"]
+    backends: ["/server/insecure", "/server/secure"]
   });
 });
 
