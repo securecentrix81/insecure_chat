@@ -83,7 +83,7 @@ function getPasswordHint(actual, attempt) {
 
 module.exports = function initChat() {  
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id)
+    console.log("Secure:", "Secure:", "Secure:", "User connected:", socket.id)
     
     // LOGIN - The most insecure login ever
     socket.on("login", (data) => {
@@ -97,7 +97,7 @@ module.exports = function initChat() {
           user: randomUser,
           message: `Logged in as random user: ${randomUser.username}`
         })
-        console.log(`Secure: [LOGIN] Random login as ${randomUser.username}`)
+        console.log("Secure:", `[LOGIN] Random login as ${randomUser.username}`)
         return
       }
       
@@ -112,7 +112,7 @@ module.exports = function initChat() {
             user: user,
             message: "Logged in with empty password!"
           })
-          console.log(`Secure: [LOGIN] Empty password login for ${username}`)
+          console.log("Secure:", `[LOGIN] Empty password login for ${username}`)
           return
         }
         
@@ -123,7 +123,7 @@ module.exports = function initChat() {
             user: user,
             message: "Login successful!"
           })
-          console.log(`Secure: [LOGIN] ${username} logged in`)
+          console.log("Secure:", `[LOGIN] ${username} logged in`)
           return
         }
         
@@ -196,7 +196,7 @@ module.exports = function initChat() {
         password: newUser.password,
         message: "Account created!"
       })
-      console.log(`Secure: [SIGNUP] New user: ${username} with password: ${newUser.password}`)
+      console.log("Secure:", `[SIGNUP] New user: ${username} with password: ${newUser.password}`)
     })
     
     // PASSWORD RECOVERY - Just tells you the password!
@@ -254,7 +254,7 @@ module.exports = function initChat() {
           success: true,
           username: newUsername
         })
-        console.log(`Secure: [CHANGE] Username: ${oldUsername} -> ${newUsername}`)
+        console.log("Secure:", `[CHANGE] Username: ${oldUsername} -> ${newUsername}`)
       }
     })
     
@@ -278,7 +278,7 @@ module.exports = function initChat() {
           success: true,
           password: user.password
         })
-        console.log(`Secure: [CHANGE] Password for ${username}: ${user.password}`)
+        console.log("Secure:", `[CHANGE] Password for ${username}: ${user.password}`)
         return
       }
       
@@ -314,7 +314,7 @@ module.exports = function initChat() {
         success: true,
         message: message
       })
-      console.log(`Secure: [DELETE] User deleted: ${username} (password was: ${deletedUser.password})`)
+      console.log("Secure:", `[DELETE] User deleted: ${username} (password was: ${deletedUser.password})`)
     })
     
     // JOIN ROOM
@@ -330,7 +330,7 @@ module.exports = function initChat() {
             success: true,
             room: room
           })
-          console.log(`Secure: [ROOM] ${username} joined ${room}`)
+          console.log("Secure:", `[ROOM] ${username} joined ${room}`)
           return
         }
         
@@ -351,26 +351,26 @@ module.exports = function initChat() {
         room: room,
         created: true
       })
-      console.log(`Secure: [ROOM] ${username} created and joined ${room}`)
+      console.log("Secure:", `[ROOM] ${username} created and joined ${room}`)
     })
     
     // LEAVE ROOM
     socket.on("leave-room", (data) => {
       socket.leave(data.room)
-      console.log(`Secure: [ROOM] User left ${data.room}`)
+      console.log("Secure:", `[ROOM] User left ${data.room}`)
     })
     
     // MESSAGES - No rate limiting, no history!
     socket.on("message", (data) => {
       // Broadcast to room (no saving!)
       io.to(data.room).emit("message", data)
-      console.log(`Secure: [MSG] ${data.username} in ${data.room}: ${data.message}`)
+      console.log("Secure:", `[MSG] ${data.username} in ${data.room}: ${data.message}`)
     })
     
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id)
+      console.log("Secure:", "Secure:", "Secure:", "User disconnected:", socket.id)
     })
   })
   
-  console.log("✅ [Secure Chat] Backend initialized");
+  console.log("Secure:", "Secure:", "Secure:", "✅ [Secure Chat] Backend initialized");
 }
