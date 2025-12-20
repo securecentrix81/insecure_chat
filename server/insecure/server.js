@@ -761,7 +761,7 @@ module.exports = function initChat(io, app) {
     });
     
     socket.on("disconnect", () => {
-      console.log("[Chat] User disconnected:", socket.id.substring(0, 8) + "...");
+      console.log("[Insecure Chat] User disconnected:", socket.id.substring(0, 8) + "...");
     });
   });
   
