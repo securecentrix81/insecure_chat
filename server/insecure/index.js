@@ -743,7 +743,8 @@ module.exports = function initChat(io, app) {
         username: currentSession.username,
         messageID: data.messageID || crypto.randomBytes(16).toString("hex"),
         room: data.room,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        encrypted: data.encrypted
       };
       
       // Use io.to() - io here is the namespace passed in
