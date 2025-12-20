@@ -1,9 +1,3 @@
-const express = require("express")
-const app = express()
-const http = require("http")
-const server = http.createServer(app)
-const io = require("socket.io")(server)
-
 // In-memory "database" - very secure, data disappears on restart!
 let users = [
   { username: "admin", password: "admin123" },
@@ -81,7 +75,7 @@ function getPasswordHint(actual, attempt) {
   return newFeedback.join(". ")
 }
 
-module.exports = function initChat() {  
+module.exports = function initChat(io, app) {  
   io.on("connection", (socket) => {
     console.log("Secure:", "User connected:", socket.id)
     
