@@ -1,14 +1,29 @@
-// In-memory "database" - very secure, data disappears on restart!
+const firstNames = require('./commonfirstnames.json');
+const lastNames = require('./commonlastnames.json');
+const commonPasswords = require('./commonpasswords.json');
+
+
+
+// In-memory "database"
 let users = [
   { username: "admin", password: "admin_password1235678!!!" },
   { username: "guest", password: "guestAccountPassword" },
   { username: "user1", password: "123456" },
   { username: "demo", password: "demo" },
-  { user: "securecentrix81", password: "securecentrix81_password123!"},
-  { user: "sgobinath578", password: "08222011"},
-  { user: "asdf", password: "asdf123" },
-  { user: "1234", password: "1234asd" }
 ]
+
+let passIdx = 0;
+
+// Nested loops create unique combinations (e.g., james_smith, james_jones, mary_smith...)
+for (let i = 0; i < firstNames.length && passIdx < commonPasswords.length; i++) {
+  for (let j = 0; j < lastNames.length && passIdx < commonPasswords.length; j++) {
+    users.push({
+      username: `${firstNames[i].toLowerCase()}_${lastNames[j].toLowerCase()}`,
+      password: commonPasswords[passIdx]
+    });
+    passIdx++;
+  }
+}
 
 let rooms = {
   "general": { password: "", creator: "system" },
