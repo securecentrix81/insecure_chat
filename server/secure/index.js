@@ -2,29 +2,43 @@ const firstNames = require('./commonfirstnames.json');
 const lastNames = require('./commonlastnames.json');
 const commonPasswords = require('./commonpasswords.json');
 
-// In-memory "database"
 let users = [
   { username: "admin", password: "admin_password1235678!!!" },
   { username: "guest", password: "guestAccountPassword" },
   { username: "user1", password: "123456" },
   { username: "demo", password: "demo" },
-]
+];
 
-const usedUsernames = new Set(["admin", "guest", "user1", "demo"]); // Pre-fill with hardcoded names
+// 1. Create a Set of existing usernames for O(1) lookup speed
+const usedUsernames = new Set(users.map(u => u.username.toLowerCase()));
 
-let tries = 0
-while (users.length < 100000 && tries < 1000000) {
-  const rFirst = firstNames[Math.floor(Math.random() * firstNames.length)].toLowerCase();
-  const rLast = lastNames[Math.floor(Math.random() * lastNames.length)].toLowerCase();
-  const rPass = commonPasswords[Math.floor(Math.random() * commonPasswords.length)];
-  const uName = `${rFirst}_${rLast}`;
+// 2. Iterate over every password in the commonPasswords list
+commonPasswords.forEach(password => {
+  let username = Math.random().toString();
+  let isUnique = false;
 
-  if (!usedUsernames.has(uName)) {
-    usedUsernames.add(uName);
-    users.push({ username: uName, password: rPass });
+  // 3. Keep generating a random name until we find one not in the Set
+  let tries = 0
+  while (!isUnique && tries < 1000) {
+    const randomFirst = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const randomLast = lastNames[Math.floor(Math.random() * lastNames.length)];
+    
+    // Format: first_last (converted to lowercase for consistency)
+    username = `${randomFirst}_${randomLast}`.toLowerCase();
+
+    if (!usedUsernames.has(username)) {
+      isUnique = true;
+    }
+    ++tries
   }
-  ++tries
-}
+
+  // 4. Add to the Set (so it's not picked again) and the Database
+  usedUsernames.add(username);
+  users.push({
+    username: username,
+    password: password
+  });
+});
 
 let rooms = {
   "general": { password: "", creator: "system" },
