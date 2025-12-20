@@ -66,12 +66,12 @@ function getPasswordHint(actual, attempt) {
   let lengthHint = ""
   if (actual.length !== attempt.length) {
     lengthHint = actual.length > attempt.length 
-      ? `(Target is longer: ${actual.length} chars)` 
-      : `(Target is shorter: ${actual.length} chars)`
+      ? `Password should be longer` 
+      : `Password should be shorter`
   }
 
   // Combine for a nice output
-  let combined = [...correctFeedback, ...yellowFeedback, ...incorrectFeedback]
+  let combined = [...incorrectFeedback, ...yellowFeedback, ...correctFeedback]
   // Limit to 5 hints to avoid flooding UI, prioritize Green > Yellow > Gray
   return lengthHint + " " + combined.slice(0, 5).join(", ")
 }
