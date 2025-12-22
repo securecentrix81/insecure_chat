@@ -11,7 +11,7 @@ const socket = io(BACKEND_URL, {
   withCredentials: false, // Set to false for cross-origin without cookies
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
-  timeout: 20000
+  timeout: 120000
 });
 
 // Loading screen elements
