@@ -8,6 +8,7 @@ const BACKEND_URL = "https://chat-0qsk.onrender.com/socket/secure";
 const socket = io(BACKEND_URL, {
   transports: ["polling", "websocket"],
   withCredentials: false,
+  timeout: 120000
 });
 
 // Loading screen elements
