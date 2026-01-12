@@ -82,7 +82,18 @@ window.usefulHelpers = {
     this.kick()
     const password = overridepassword===null?"":overridepassword;
     socket.emit("join-room", { room, password, username: currentUser.username });
-  }
+  },
+  deleteLastMsg: function() {
+    const messages = document.querySelectorAll('.user-msg');
+    
+    const lastMessage = messages[messages.length - 1];
+    
+    lastMessage.remove();
+
+    if (chatBox.children.length === 0) {
+      clearChat();
+    }
+  },
 }
 
 window.u = window.usefulHelpers
