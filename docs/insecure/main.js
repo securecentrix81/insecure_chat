@@ -160,6 +160,9 @@ const chatBox = document.getElementById("chat-box");
 const msgInput = document.getElementById("msg-input");
 const sendBtn = document.getElementById("send-btn");
 
+const roomList = document.getElementById("room-list");
+const refreshRoomsBtn = document.getElementById("refresh-rooms-btn");
+
 
 // Converts string <-> ArrayBuffer
 function strToBuf(str) {
@@ -448,6 +451,11 @@ joinRoomCard.addEventListener("click", () => {
   joinRoomPanel.classList.remove("hidden");
   settingsPanel.classList.add("hidden");
   hideFeedback(roomFeedback);
+  socket.emit("get-rooms"); // ← Add this line
+});
+refreshRoomsBtn.addEventListener("click", () => {
+  roomList.innerHTML = '<div class="room-list-empty">Loading...</div>';
+  socket.emit("get-rooms");
 });
 
 cancelRoomBtn.addEventListener("click", () => {
@@ -729,6 +737,38 @@ socket.on("message", async (data) => {
     
     renderMessage(data, false);
   }
+});
+
+socket.on("room-list", (data) => {
+  if (!data.success || data.rooms.length === 0) {
+    roomList.innerHTML = '<div class="room-list-empty">No rooms yet. Create one below!</div>';
+    return;
+  }
+  
+  roomList.innerHTML = data.rooms.map(room => `
+    <div class="room-list-item" data-room="${escapeHTML(room.name)}" data-protected="${room.hasPassword}">
+      <span class="room-list-name">#${escapeHTML(room.name)}</span>
+      ${room.hasPassword ? '<span class="room-list-lock">🔒</span>' : ''}
+    </div>
+  `).join("");
+  
+  // Add click handlers
+  roomList.querySelectorAll(".room-list-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const name = item.dataset.room;
+      const isProtected = item.dataset.protected === "true";
+      
+      roomName.value = name;
+      
+      if (isProtected) {
+        roomPassword.focus();
+        showFeedback(roomFeedback, "🔒 This room requires a password", "info");
+      } else {
+        roomPassword.value = "";
+        joinRoomBtn.click();
+      }
+    });
+  });
 });
 
 // Password visibility toggle
