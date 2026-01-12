@@ -100,12 +100,12 @@ function getPasswordHint(actual, attempt) {
   let lengthHint = "";
   if (actual.length !== attempt.length) {
     lengthHint = actual.length > attempt.length 
-      ? `Password should be longer` 
-      : `Password should be shorter`;
+      ? `Password should be longer\n\n` 
+      : `Password should be shorter\n\n`;
   }
 
   let combined = [...incorrectFeedback, ...yellowFeedback, ...correctFeedback];
-  return lengthHint + " " + combined.join(", ");
+  return lengthHint +  combined.join("\n");
 }
 
 // Helper: Get login attempts for a username
