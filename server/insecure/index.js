@@ -1,22 +1,29 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const axios = require("axios");
 
 // ============================================
 // 🔧 CONFIGURATION
 // ============================================
 if (!process.env.MONGO_URI) {
-  console.error("Insecure:", "❌ CRITICAL: MONGO_URI environment variable is not set!");
+  console.error("❌ CRITICAL: MONGO_URI environment variable is not set!");
   process.exit(1);
 }
 
 if (!process.env.SALT) {
-  console.error("Insecure:", "❌ CRITICAL: SALT environment variable is not set!");
+  console.error("❌ CRITICAL: SALT environment variable is not set!");
+  process.exit(1);
+}
+
+if (!process.env.TURNSTILE_SECRET_KEY) {
+  console.error("❌ CRITICAL: TURNSTILE_SECRET_KEY environment variable is not set!");
   process.exit(1);
 }
 
 const MONGO_URI = process.env.MONGO_URI;
 const SALT = process.env.SALT;
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
 const SALT_ROUNDS = 14;
 
 // Encryption helpers
@@ -48,7 +55,7 @@ function decrypt(encryptedData) {
   }
 }
 
-// MongoDB connection (shared across the app)
+// MongoDB connection
 let mongoConnected = false;
 
 async function connectMongo() {
@@ -61,7 +68,7 @@ async function connectMongo() {
   });
   
   mongoConnected = true;
-  console.log("Insecure:", "🔒 [Chat] Connected to MongoDB");
+  console.log("🔒 [Chat] Connected to MongoDB");
 }
 
 // User Schema
@@ -97,16 +104,21 @@ function hashUsername(username) {
   return crypto.createHmac("sha256", SALT).update(username.toLowerCase().trim()).digest("hex");
 }
 
-// Rate limiting
+// ============================================
+// RATE LIMITING
+// ============================================
 const rateLimits = new Map();
 
 const RATE_LIMITS = {
-  login: { max: 3, window: 120000 },
-  signup: { max: 1, window: 120000 },
+  // IP-based limits (for pre-auth actions) - higher limits for shared networks
+  "login-ip": { max: 30, window: 60000 },      // 30 logins per minute per IP
+  "signup-ip": { max: 10, window: 60000 },     // 10 signups per minute per IP
+  
+  // Session-based limits (for authenticated actions)
+  "message": { max: 30, window: 30000 },       // 30 messages per 30 seconds per user
+  "join-room": { max: 10, window: 60000 },     // 10 room joins per minute per user
   "change-password": { max: 3, window: 300000 },
-  "change-username": { max: 1, window: 300000 },
-  "join-room": { max: 10, window: 60000 },
-  "message": { max: 30, window: 30000 }
+  "change-username": { max: 2, window: 300000 }
 };
 
 function checkRateLimit(identifier, action) {
@@ -126,6 +138,20 @@ function checkRateLimit(identifier, action) {
   return record.attempts <= config.max;
 }
 
+// Get remaining attempts for a rate limit
+function getRateLimitRemaining(identifier, action) {
+  const config = RATE_LIMITS[action] || { max: 10, window: 60000 };
+  const key = `${identifier}:${action}`;
+  const now = Date.now();
+  const record = rateLimits.get(key);
+  
+  if (!record || now - record.windowStart > config.window) {
+    return config.max;
+  }
+  
+  return Math.max(0, config.max - record.attempts);
+}
+
 // Cleanup interval
 setInterval(() => {
   const now = Date.now();
@@ -143,7 +169,45 @@ setInterval(() => {
   }
 }, 300000);
 
-// Input validation helpers
+// ============================================
+// TURNSTILE VERIFICATION
+// ============================================
+async function verifyTurnstile(token, clientIP) {
+  if (!token || typeof token !== "string") {
+    return { success: false, error: "Missing captcha token" };
+  }
+  
+  try {
+    const response = await axios.post(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      new URLSearchParams({
+        secret: TURNSTILE_SECRET_KEY,
+        response: token,
+        remoteip: clientIP
+      }),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: 5000
+      }
+    );
+    
+    if (response.data.success) {
+      return { success: true };
+    } else {
+      console.log("[Turnstile] Verification failed:", response.data["error-codes"]);
+      return { success: false, error: "Captcha verification failed" };
+    }
+  } catch (error) {
+    console.error("[Turnstile] API error:", error.message);
+    // On network error, we can choose to fail open or closed
+    // Failing closed is more secure but may block legitimate users
+    return { success: false, error: "Captcha service unavailable" };
+  }
+}
+
+// ============================================
+// INPUT VALIDATION
+// ============================================
 function validateUsername(username) {
   if (!username || typeof username !== "string") return false;
   if (username.length < 3 || username.length > 30) return false;
@@ -170,7 +234,7 @@ function sanitizeMessage(message) {
 }
 
 function getClientIP(socket) {
-  return socket.handshake.headers["x-forwarded-for"]?.split(",")[0] || 
+  return socket.handshake.headers["x-forwarded-for"]?.split(",")[0]?.trim() || 
          socket.handshake.address || 
          "unknown";
 }
@@ -181,16 +245,17 @@ function getClientIP(socket) {
 module.exports = function initChat(io, app) {
   // Connect to MongoDB
   connectMongo().catch(err => {
-    console.error("Insecure:", "MongoDB connection error:", err.message);
+    console.error("MongoDB connection error:", err.message);
     process.exit(1);
   });
 
-  // Optional: Add HTTP routes specific to this backend
+  // Status endpoint
   app.get("/chat/status", (req, res) => {
     res.json({ 
-      backend: "chat",
+      backend: "insecure-chat",
       status: "running",
-      activeSessions: activeSessions.size
+      activeSessions: activeSessions.size,
+      turnstileEnabled: true
     });
   });
 
@@ -199,29 +264,46 @@ module.exports = function initChat(io, app) {
   // ============================================
   io.on("connection", (socket) => {
     const clientIP = getClientIP(socket);
-    console.log("Insecure:", "[Chat] User connected:", socket.id.substring(0, 8) + "...");
+    console.log("[Chat] User connected:", socket.id.substring(0, 8) + "...");
     
     let currentSession = null;
     
-    // LOGIN
+    // ==========================================
+    // LOGIN (with Turnstile)
+    // ==========================================
     socket.on("login", async (data) => {
       try {
-        const { username, password } = data || {};
+        const { username, password, captchaToken } = data || {};
         
-        if (!checkRateLimit(clientIP, "login")) {
+        // 1. IP-based rate limit (high limit for shared networks)
+        if (!checkRateLimit(clientIP, "login-ip")) {
           socket.emit("login-result", {
             success: false,
-            message: "⚠️ Too many login attempts. Please wait a minute.",
+            message: "⚠️ Too many login attempts from this network. Please wait.",
             type: "error"
           });
           return;
         }
         
+        // 2. Verify Turnstile CAPTCHA
+        const turnstileResult = await verifyTurnstile(captchaToken, clientIP);
+        if (!turnstileResult.success) {
+          socket.emit("login-result", {
+            success: false,
+            message: "🤖 " + (turnstileResult.error || "Please complete the captcha."),
+            type: "error",
+            resetCaptcha: true
+          });
+          return;
+        }
+        
+        // 3. Validate input
         if (!validateUsername(username)) {
           socket.emit("login-result", {
             success: false,
             message: "🔓 Invalid username format.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
@@ -230,11 +312,13 @@ module.exports = function initChat(io, app) {
           socket.emit("login-result", {
             success: false,
             message: "🔓 Password is required.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
         
+        // 4. Find user
         const usernameHash = hashUsername(username);
         const user = await User.findOne({ usernameHash });
         
@@ -243,25 +327,30 @@ module.exports = function initChat(io, app) {
           socket.emit("login-result", {
             success: false,
             message: "🔓 Invalid credentials.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
         
+        // 5. Verify password
         const passwordValid = await bcrypt.compare(password + SALT, user.passwordHash);
         
         if (!passwordValid) {
           socket.emit("login-result", {
             success: false,
             message: "🔓 Invalid credentials.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
         
+        // 6. Update last login
         user.lastLogin = new Date();
         await user.save();
         
+        // 7. Create session
         const sessionToken = generateSessionToken();
         const decryptedUsername = decrypt(user.usernameEncrypted);
         
@@ -292,34 +381,52 @@ module.exports = function initChat(io, app) {
         
         console.log(`[Chat][LOGIN] User logged in`);
       } catch (error) {
-        console.error("Insecure:", "[Chat] Login error:", error.message);
+        console.error("[Chat] Login error:", error.message);
         socket.emit("login-result", {
           success: false,
           message: "An error occurred. Please try again.",
-          type: "error"
+          type: "error",
+          resetCaptcha: true
         });
       }
     });
     
-    // SIGNUP
+    // ==========================================
+    // SIGNUP (with Turnstile)
+    // ==========================================
     socket.on("signup", async (data) => {
       try {
-        const { username, password } = data || {};
+        const { username, password, captchaToken } = data || {};
         
-        if (!checkRateLimit(clientIP, "signup")) {
+        // 1. IP-based rate limit
+        if (!checkRateLimit(clientIP, "signup-ip")) {
           socket.emit("signup-result", {
             success: false,
-            message: "⚠️ Too many signup attempts. Please wait.",
+            message: "⚠️ Too many signup attempts from this network. Please wait.",
             type: "error"
           });
           return;
         }
         
+        // 2. Verify Turnstile CAPTCHA
+        const turnstileResult = await verifyTurnstile(captchaToken, clientIP);
+        if (!turnstileResult.success) {
+          socket.emit("signup-result", {
+            success: false,
+            message: "🤖 " + (turnstileResult.error || "Please complete the captcha."),
+            type: "error",
+            resetCaptcha: true
+          });
+          return;
+        }
+        
+        // 3. Validate input
         if (!validateUsername(username)) {
           socket.emit("signup-result", {
             success: false,
             message: "Username must be 3-30 characters (letters, numbers, _ or -).",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
@@ -328,23 +435,27 @@ module.exports = function initChat(io, app) {
           socket.emit("signup-result", {
             success: false,
             message: "🔓 Password must be 8-128 characters.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
         
+        // 4. Check if user exists
         const usernameHash = hashUsername(username);
-        
         const existingUser = await User.findOne({ usernameHash });
+        
         if (existingUser) {
           socket.emit("signup-result", {
             success: false,
             message: "🔓 This username is already taken.",
-            type: "error"
+            type: "error",
+            resetCaptcha: true
           });
           return;
         }
         
+        // 5. Create user
         const passwordHash = await bcrypt.hash(password + SALT, SALT_ROUNDS);
         const usernameEncrypted = encrypt(username);
         
@@ -356,6 +467,7 @@ module.exports = function initChat(io, app) {
         
         await newUser.save();
         
+        // 6. Create session
         const sessionToken = generateSessionToken();
         currentSession = {
           token: sessionToken,
@@ -375,16 +487,19 @@ module.exports = function initChat(io, app) {
         
         console.log(`[Chat][SIGNUP] New user created`);
       } catch (error) {
-        console.error("Insecure:", "[Chat] Signup error:", error.message);
+        console.error("[Chat] Signup error:", error.message);
         socket.emit("signup-result", {
           success: false,
           message: "An error occurred. Please try again.",
-          type: "error"
+          type: "error",
+          resetCaptcha: true
         });
       }
     });
     
+    // ==========================================
     // SESSION VALIDATION
+    // ==========================================
     socket.on("validate-session", async (data) => {
       const { sessionToken } = data || {};
       
@@ -407,24 +522,27 @@ module.exports = function initChat(io, app) {
       }
     });
     
-    // CHANGE USERNAME
+    // ==========================================
+    // CHANGE USERNAME (session-based rate limit)
+    // ==========================================
     socket.on("change-username", async (data) => {
       try {
         const { sessionToken, newUsername, password } = data || {};
-        
-        if (!checkRateLimit(clientIP, "change-username")) {
-          socket.emit("change-username-result", {
-            success: false,
-            message: "Too many attempts. Please wait."
-          });
-          return;
-        }
         
         const session = activeSessions.get(sessionToken);
         if (!session) {
           socket.emit("change-username-result", {
             success: false,
             message: "Session expired. Please login again."
+          });
+          return;
+        }
+        
+        // Rate limit by session token (per user)
+        if (!checkRateLimit(session.token, "change-username")) {
+          socket.emit("change-username-result", {
+            success: false,
+            message: "Too many attempts. Please wait 5 minutes."
           });
           return;
         }
@@ -489,7 +607,7 @@ module.exports = function initChat(io, app) {
         
         console.log(`[Chat][CHANGE] Username updated`);
       } catch (error) {
-        console.error("Insecure:", "[Chat] Change username error:", error.message);
+        console.error("[Chat] Change username error:", error.message);
         socket.emit("change-username-result", {
           success: false,
           message: "An error occurred."
@@ -497,24 +615,27 @@ module.exports = function initChat(io, app) {
       }
     });
     
-    // CHANGE PASSWORD
+    // ==========================================
+    // CHANGE PASSWORD (session-based rate limit)
+    // ==========================================
     socket.on("change-password", async (data) => {
       try {
         const { sessionToken, oldPassword, newPassword } = data || {};
-        
-        if (!checkRateLimit(clientIP, "change-password")) {
-          socket.emit("change-password-result", {
-            success: false,
-            message: "Too many attempts. Please wait."
-          });
-          return;
-        }
         
         const session = activeSessions.get(sessionToken);
         if (!session) {
           socket.emit("change-password-result", {
             success: false,
             message: "Session expired. Please login again."
+          });
+          return;
+        }
+        
+        // Rate limit by session token (per user)
+        if (!checkRateLimit(session.token, "change-password")) {
+          socket.emit("change-password-result", {
+            success: false,
+            message: "Too many attempts. Please wait 5 minutes."
           });
           return;
         }
@@ -563,7 +684,7 @@ module.exports = function initChat(io, app) {
         
         console.log(`[Chat][CHANGE] Password updated`);
       } catch (error) {
-        console.error("Insecure:", "[Chat] Change password error:", error.message);
+        console.error("[Chat] Change password error:", error.message);
         socket.emit("change-password-result", {
           success: false,
           message: "An error occurred."
@@ -571,7 +692,9 @@ module.exports = function initChat(io, app) {
       }
     });
     
+    // ==========================================
     // DELETE ACCOUNT
+    // ==========================================
     socket.on("delete-account", async (data) => {
       try {
         const { sessionToken, password } = data || {};
@@ -621,7 +744,7 @@ module.exports = function initChat(io, app) {
         
         console.log(`[Chat][DELETE] User deleted`);
       } catch (error) {
-        console.error("Insecure:", "[Chat] Delete account error:", error.message);
+        console.error("[Chat] Delete account error:", error.message);
         socket.emit("delete-account-result", {
           success: false,
           message: "An error occurred."
@@ -629,24 +752,28 @@ module.exports = function initChat(io, app) {
       }
     });
     
-    // JOIN ROOM
+    // ==========================================
+    // JOIN ROOM (session-based rate limit)
+    // ==========================================
     socket.on("join-room", async (data) => {
       try {
         const { room, password, sessionToken } = data || {};
-        
-        if (!checkRateLimit(clientIP, "join-room")) {
-          socket.emit("join-room-result", {
-            success: false,
-            message: "Too many attempts. Please wait."
-          });
-          return;
-        }
         
         const session = activeSessions.get(sessionToken);
         if (!session) {
           socket.emit("join-room-result", {
             success: false,
             message: "Session expired. Please login again."
+          });
+          return;
+        }
+        
+        // Rate limit by session token (per user)
+        if (!checkRateLimit(session.token, "join-room")) {
+          const remaining = getRateLimitRemaining(session.token, "join-room");
+          socket.emit("join-room-result", {
+            success: false,
+            message: `Too many room joins. Please wait. (${remaining} remaining)`
           });
           return;
         }
@@ -710,7 +837,7 @@ module.exports = function initChat(io, app) {
           console.log(`[Chat][ROOM] User created ${roomLower}`);
         }
       } catch (error) {
-        console.error("Insecure:", "[Chat] Join room error:", error.message);
+        console.error("[Chat] Join room error:", error.message);
         socket.emit("join-room-result", {
           success: false,
           message: "An error occurred."
@@ -718,7 +845,9 @@ module.exports = function initChat(io, app) {
       }
     });
     
+    // ==========================================
     // LEAVE ROOM
+    // ==========================================
     socket.on("leave-room", (data) => {
       if (data && data.room) {
         socket.leave(data.room);
@@ -726,12 +855,19 @@ module.exports = function initChat(io, app) {
       }
     });
     
-    // MESSAGES
+    // ==========================================
+    // MESSAGES (session-based rate limit)
+    // ==========================================
     socket.on("message", (data) => {
       if (!currentSession) return;
       if (!data || !data.room || !data.message) return;
       
-      if (!checkRateLimit(clientIP, "message")) {
+      // Rate limit by session token (per user)
+      if (!checkRateLimit(currentSession.token, "message")) {
+        socket.emit("message-error", {
+          message: "You're sending messages too fast! Slow down.",
+          messageID: data.messageID
+        });
         return;
       }
       
@@ -747,10 +883,12 @@ module.exports = function initChat(io, app) {
         encrypted: data.encrypted
       };
       
-      // Use io.to() - io here is the namespace passed in
       io.to(data.room).emit("message", messageData);
     });
+    
+    // ==========================================
     // GET ROOMS LIST
+    // ==========================================
     socket.on("get-rooms", async () => {
       try {
         const rooms = await Room.find({}, "name passwordHash")
@@ -769,20 +907,22 @@ module.exports = function initChat(io, app) {
       }
     });
     
+    // ==========================================
     // LOGOUT
+    // ==========================================
     socket.on("logout", (data) => {
       const { sessionToken } = data || {};
       if (sessionToken) {
         activeSessions.delete(sessionToken);
       }
       currentSession = null;
-      console.log("Insecure:", "[Chat][LOGOUT] User logged out");
+      console.log("[Chat][LOGOUT] User logged out");
     });
     
     socket.on("disconnect", () => {
-      console.log("Insecure:", "[Insecure Chat] User disconnected:", socket.id.substring(0, 8) + "...");
+      console.log("[Chat] User disconnected:", socket.id.substring(0, 8) + "...");
     });
   });
   
-  console.log("Insecure:", "✅ [Insecure Chat] Backend initialized");
+  console.log("✅ [Insecure Chat] Backend initialized with Turnstile protection");
 };
