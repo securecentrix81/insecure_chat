@@ -42,11 +42,17 @@
               <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)">👁️</button>
             </div>
           </div>
+          <div class="form-group captcha-group">
+            <label class="form-label">🤖 Prove you're human</label>
+            <div class="captcha-display" id="login-captcha-display">Loading captcha...</div>
+            <input type="text" class="form-input" id="login-captcha-input" placeholder="Type the text above">
+            <button type="button" class="btn-link captcha-refresh" id="login-captcha-refresh">🔄 New captcha</button>
+          </div>
           <div id="login-feedback" class="feedback"></div>
           <button class="btn-primary" id="login-btn">Login</button>
           <button class="btn-link" id="forgot-password-btn">Forgot password?</button>
         </div>
-
+        
         <!-- Signup Form -->
         <div class="auth-form hidden" id="signup-form">
           <div class="warning-box">
@@ -63,10 +69,15 @@
               <button type="button" class="password-toggle" onclick="togglePassword('signup-password', this)">👁️</button>
             </div>
           </div>
+          <div class="form-group captcha-group">
+            <label class="form-label">🤖 Prove you're human</label>
+            <div class="captcha-display" id="signup-captcha-display">Loading captcha...</div>
+            <input type="text" class="form-input" id="signup-captcha-input" placeholder="Type the text above">
+            <button type="button" class="btn-link captcha-refresh" id="signup-captcha-refresh">🔄 New captcha</button>
+          </div>
           <div id="signup-feedback" class="feedback"></div>
           <button class="btn-primary" id="signup-btn">Create Account</button>
         </div>
-
         <!-- Forgot Password Form -->
         <div class="auth-form hidden" id="forgot-form">
           <h3 class="form-title">🔑 Password Recovery</h3>
@@ -134,9 +145,18 @@
           <button class="btn-secondary" id="cancel-room-btn">Cancel</button>
           <button class="btn-primary" id="join-room-btn">Join/Create Room</button>
         </div>
+        <div id="room-list-container">
+          <div class="room-list-header">
+            <span>Available Rooms</span>
+            <button type="button" class="btn-refresh" id="refresh-rooms-btn">🔄</button>
+          </div>
+          <div id="room-list" class="room-list">
+            <div class="room-list-empty">Loading...</div>
+          </div>
+        </div>
       </div>
 
-            <!-- Settings Panel -->
+      <!-- Settings Panel -->
       <div class="panel hidden" id="settings-panel">
         <h3 class="panel-title">⚙️ Account Settings</h3>
         
