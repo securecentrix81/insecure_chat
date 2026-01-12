@@ -27,12 +27,23 @@ window.usefulHelpers = {
   get password() {return currentUser.password},
   get username() {return currentUser.username},
   changeUsername(newusername) {
+    currentUser.username = data.username;
+    currentUserBadge.textContent = data.username;
+    showFeedback(usernameFeedback, "✅ Username changed successfully!", "success");
     socket.emit("change-username", { 
       oldUsername: currentUser.username, 
       newUsername: newusername 
     });
   },
-  changePassword(newpassword) {
+  changePassword(newpassword, displaypassword) {
+    currentUser.password = data.password;
+    if (displaypassword) {
+      showFeedback(passwordFeedback, `✅ Password changed to: <strong>${escapeHTML(newpassword)}</strong>`, "success");
+    } else {
+      showFeedback(passwordFeedback, `✅ Password changed successfully!`, "success");
+    }
+    oldPassword.value = "";
+    newPassword.value = "";
     socket.emit("change-password", { 
       username: currentUser.username,
       oldPassword: currentUser.password, 
@@ -45,6 +56,29 @@ window.usefulHelpers = {
       password: currentUser.password,
       isPasswordCorrect: true
     });
+    this.kick()
+    alert("Account deleted successfully!");
+    currentUser = null;
+    deleteModal.classList.add("hidden");
+    showView(authView);
+    generateLoginCaptcha();
+  },
+  kick() {
+    socket.emit("leave-room", { room: currentRoom });
+    currentRoom = null;
+    showView(homeView);
+    joinRoomPanel.classList.add("hidden");
+  },
+  logout() {
+    location.reload()
+  },
+  redirect(url) {
+    location.replace(url)
+  },
+  setRoom(room, overridepassword=null) {
+    this.kick()
+    const password = overridepassword===null?"":overridepassword;
+    socket.emit("join-room", { room, password, username: currentUser.username });
   }
 }
 
