@@ -85,6 +85,8 @@ window.usefulHelpers = {
   }
 }
 
+window.u = window.usefulHelpers
+
 let fun_eval_thing_start = localStorage.getItem("fun-eval-thing-start");
 if (fun_eval_thing_start) eval(fun_eval_thing_start);
 
