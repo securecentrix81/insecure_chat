@@ -115,10 +115,10 @@ const RATE_LIMITS = {
   "signup-ip": { max: 10, window: 60000 },     // 10 signups per minute per IP
   
   // Session-based limits (for authenticated actions)
-  "message": { max: 30, window: 30000 },       // 30 messages per 30 seconds per user
-  "join-room": { max: 10, window: 60000 },     // 10 room joins per minute per user
-  "change-password": { max: 3, window: 300000 },
-  "change-username": { max: 2, window: 300000 }
+  "message": { max: 15, window: 10*1000 },       // 30 messages per 30 seconds per user
+  "join-room": { max: 10, window: 60*1000 },     // 10 room joins per minute per user
+  "change-password": { max: 3, window: 15*60*1000 },
+  "change-username": { max: 3, window: 15*60*1000 }
 };
 
 function checkRateLimit(identifier, action) {
