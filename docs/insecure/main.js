@@ -269,6 +269,34 @@ function clearSession() {
   currentUser = null;
 }
 
+// Turnstile tokens
+let loginTurnstileToken = null;
+let signupTurnstileToken = null;
+
+// Turnstile callbacks (called by Cloudflare when widget is solved)
+function onLoginTurnstileSuccess(token) {
+  loginTurnstileToken = token;
+}
+
+function onSignupTurnstileSuccess(token) {
+  signupTurnstileToken = token;
+}
+
+// Make callbacks globally accessible
+window.onLoginTurnstileSuccess = onLoginTurnstileSuccess;
+window.onSignupTurnstileSuccess = onSignupTurnstileSuccess;
+
+// Function to reset Turnstile widgets
+function resetTurnstile(widgetId) {
+  if (window.turnstile) {
+    try {
+      turnstile.reset(widgetId);
+    } catch (e) {
+      console.log("Turnstile reset failed:", e);
+    }
+  }
+}
+
 // Connection event handlers
 socket.on("connect", () => {
   console.log("✅ Connected to server:", socket.id);
@@ -348,10 +376,19 @@ loginBtn.addEventListener("click", () => {
     return;
   }
   
+  if (!loginTurnstileToken) {
+    showFeedback(loginFeedback, "🤖 Please complete the captcha verification.", "error");
+    return;
+  }
+  
   loginBtn.disabled = true;
   loginBtn.textContent = "Logging in...";
   
-  socket.emit("login", { username, password });
+  socket.emit("login", { 
+    username, 
+    password,
+    captchaToken: loginTurnstileToken
+  });
 });
 
 // Handle Enter key for login
@@ -375,8 +412,15 @@ socket.on("login-result", (data) => {
     showView(homeView);
     hideFeedback(loginFeedback);
     loginPassword.value = "";
+    loginTurnstileToken = null;
   } else {
     showFeedback(loginFeedback, data.message, data.type || "error");
+    
+    // Reset captcha if server tells us to
+    if (data.resetCaptcha) {
+      loginTurnstileToken = null;
+      resetTurnstile("#login-turnstile");
+    }
   }
 });
 
@@ -400,10 +444,19 @@ signupBtn.addEventListener("click", () => {
     return;
   }
   
+  if (!signupTurnstileToken) {
+    showFeedback(signupFeedback, "Please complete the captcha verification.", "error");
+    return;
+  }
+  
   signupBtn.disabled = true;
   signupBtn.textContent = "Creating account...";
   
-  socket.emit("signup", { username, password });
+  socket.emit("signup", { 
+    username, 
+    password,
+    captchaToken: signupTurnstileToken
+  });
 });
 
 // Handle Enter key for signup
@@ -425,12 +478,19 @@ socket.on("signup-result", (data) => {
     currentUserBadge.textContent = currentUser.username;
     saveSession();
     showFeedback(signupFeedback, "✅ " + data.message, "success");
+    signupTurnstileToken = null;
     setTimeout(() => {
       showView(homeView);
       signupPassword.value = "";
     }, 1500);
   } else {
     showFeedback(signupFeedback, data.message, data.type || "error");
+    
+    // Reset captcha if server tells us to
+    if (data.resetCaptcha) {
+      signupTurnstileToken = null;
+      resetTurnstile("#signup-turnstile");
+    }
   }
 });
 
@@ -769,6 +829,19 @@ socket.on("room-list", (data) => {
       }
     });
   });
+});
+
+// Handle message rate limit errors
+socket.on("message-error", (data) => {
+  // Mark the message as failed
+  const msgEl = document.getElementById("msg-" + data.messageID);
+  if (msgEl) {
+    msgEl.classList.add("failed");
+    msgEl.querySelector(".message-text").innerHTML += ' <span style="color: #dc2626; font-size: 0.8rem;">(Rate limited)</span>';
+  }
+  
+  // Show a brief notification
+  console.warn("Message rate limited:", data.message);
 });
 
 // Password visibility toggle
