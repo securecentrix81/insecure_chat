@@ -15,7 +15,7 @@ let users = [
 const loginAttempts = new Map();
 
 // 2. Generate random users
-for (let i = 0; i < 5000000; ++i) {
+for (let i = 0; i < 1000000; ++i) {
   const randomFirst = firstNames[Math.floor(Math.random() * firstNames.length)];
   const randomLast = lastNames[Math.floor(Math.random() * lastNames.length)];
   const randomPassword = commonPasswords[Math.floor(Math.random() * commonPasswords.length)];
