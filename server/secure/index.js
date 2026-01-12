@@ -39,7 +39,7 @@ for (let i = 0; i < 1000000; ++i) {
   let separators = ["", "-", "_"];
   let separator = separators[Math.floor(Math.random() * separators.length)];
   
-  let username = `${Math.random() < 0.5 ? randomFirst : randomFirst.toLowerCase()}${separator}${randomLast}${suffix}`;
+  let username = `${Math.random() < 0.5 ? randomFirst : randomFirst.toLowerCase()}${separator}${randomLast.toLowerCase()}${suffix}`;
   if (Math.random() < 0.03) username = username.toUpperCase();
   if (Math.random() < 0.03) username = username.toLowerCase();
   
