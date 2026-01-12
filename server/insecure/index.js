@@ -750,6 +750,24 @@ module.exports = function initChat(io, app) {
       // Use io.to() - io here is the namespace passed in
       io.to(data.room).emit("message", messageData);
     });
+    // GET ROOMS LIST
+    socket.on("get-rooms", async () => {
+      try {
+        const rooms = await Room.find({}, "name passwordHash")
+          .sort({ createdAt: -1 })
+          .limit(50);
+        
+        socket.emit("room-list", {
+          success: true,
+          rooms: rooms.map(r => ({
+            name: r.name,
+            hasPassword: !!r.passwordHash
+          }))
+        });
+      } catch (error) {
+        socket.emit("room-list", { success: false, rooms: [] });
+      }
+    });
     
     // LOGOUT
     socket.on("logout", (data) => {
