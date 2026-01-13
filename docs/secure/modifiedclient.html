@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Chat (modified client)</title>
+    <style>* {
+      box-sizing: border-box;
+      }
+
+      /* Update Body to prevent window scrolling */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #fafafa;
+        height: 100vh; /* Changed from min-height to fixed height */
+        overflow: hidden; /* Prevent body scroll */
+        color: #333;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* Update Container to manage layout */
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 16px;
+        height: 100%; /* Fill the body height */
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0 16px;
+      }
+      /* Prevent header and input from shrinking */
+      .header, .input-area {
+        flex-shrink: 0;
+      }
+
+      h1 {
+        margin: 0;
+        color: #333;
+        font-size: 1.125rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+
+      /* Auth Styles */
+      .auth-container {
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 16px;
+        padding: 24px;
+        margin-top: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
+
+      .auth-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+
+      .auth-tab {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        background: #fafafa;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .auth-tab.active {
+        background: #333;
+        color: #fff;
+        border-color: #333;
+      }
+
+      .auth-tab:not(.active):hover {
+        background: #f0f0f0;
+      }
+
+      .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-label {
+        font-size: 0.85rem;
+        color: #666;
+        font-weight: 500;
+      }
+
+      .form-input {
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .form-input:focus {
+        border-color: #333;
+      }
+
+      .form-title {
+        margin: 0 0 16px 0;
+        color: #333;
+        font-size: 1.1rem;
+      }
+
+      .btn-primary {
+        padding: 12px 24px;
+        background: #333;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+
+      .btn-primary:hover {
+        background: #444;
+      }
+
+      .btn-secondary {
+        padding: 10px 20px;
+        background: #f5f5f5;
+        color: #333;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .btn-secondary:hover {
+        background: #eee;
+      }
+
+      .btn-link {
+        padding: 8px;
+        background: transparent;
+        color: #2563eb;
+        border: none;
+        cursor: pointer;
+        font-size: 0.85rem;
+        text-decoration: underline;
+      }
+
+      .btn-link:hover {
+        color: #1d4ed8;
+      }
+
+      .btn-danger {
+        padding: 12px 24px;
+        background: #dc2626;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+
+      .btn-danger:hover {
+        background: #b91c1c;
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 8px;
+      }
+
+      .warning-box {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        color: #92400e;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+
+      .feedback {
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        display: none;
+      }
+
+      .feedback.show {
+        display: block;
+      }
+
+      .feedback.error {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+      }
+
+      .feedback.success {
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+        color: #16a34a;
+      }
+
+      .feedback.info {
+        background: #e0f2fe;
+        border: 1px solid #bae6fd;
+        color: #0284c7;
+      }
+
+      .feedback.warning {
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        color: #d97706;
+      }
+
+      /* User Badge */
+      .user-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #e8f4fd;
+        color: #2563eb;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-left: 10px;
+      }
+
+      .user-badge::before {
+        content: '👤';
+      }
+
+      /* Room Badge */
+      .room-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #e8f4fd;
+        color: #2563eb;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-left: 10px;
+      }
+
+      .room-badge::before {
+        content: '#';
+        opacity: 0.7;
+      }
+
+      .btn-clear {
+        padding: 6px 12px;
+        background: transparent;
+        color: #666;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+      }
+
+      .btn-clear:hover {
+        background: #f0f0f0;
+      }
+
+      /* Home Menu */
+      .home-menu {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+      }
+
+      .menu-card {
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 16px;
+        padding: 24px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+
+      .menu-card:hover {
+        border-color: #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+
+      .menu-icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+      }
+
+      .menu-title {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #333;
+        margin-bottom: 4px;
+      }
+
+      .menu-desc {
+        font-size: 0.85rem;
+        color: #888;
+      }
+
+      /* Panel */
+      .panel {
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 16px;
+        padding: 24px;
+        margin-top: 20px;
+      }
+
+      .panel-title {
+        margin: 0 0 20px 0;
+        color: #333;
+        font-size: 1.1rem;
+      }
+
+      /* Settings */
+      .settings-section {
+        padding: 20px 0;
+        border-bottom: 1px solid #eee;
+      }
+
+      .settings-section:last-of-type {
+        border-bottom: none;
+      }
+
+      .settings-section h4 {
+        margin: 0 0 8px 0;
+        color: #333;
+        font-size: 0.95rem;
+      }
+
+      .settings-section .hint {
+        margin: 0 0 12px 0;
+        font-size: 0.8rem;
+        color: #888;
+      }
+
+      .danger-zone {
+        background: #fef2f2;
+        border-radius: 12px;
+        padding: 20px !important;
+        margin-top: 20px;
+      }
+
+      /* Modal */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+
+      .modal-content {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+      }
+
+      .modal-content h3 {
+        margin: 0 0 16px 0;
+      }
+
+      /* Ensure Auth and Home views can still scroll if content is long */
+      #auth-view, #home-view {
+        overflow-y: auto;
+        height: 100%;
+      }
+
+      /* lock the Chat View layout */
+      #chat-view {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* Prevent container scroll */
+      }
+
+      /* Update Chat Box to scroll internally */
+      #chat-box {
+        flex: 1; /* Take all available space */
+        overflow-y: auto; /* Scroll ONLY this element */
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: #fff;
+        border-radius: 16px;
+        margin: 8px 0;
+        padding: 16px;
+        border: 1px solid #e5e5e5;
+        min-height: 0; /* Critical for flexbox scrolling */
+      }
+
+      .message {
+        max-width: 85%;
+        padding: 10px 14px;
+        border-radius: 16px;
+        line-height: 1.55;
+        word-wrap: break-word;
+        font-size: 0.95rem;
+      }
+
+      .user-msg {
+        align-self: flex-end;
+        background: #333;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+      }
+
+      .user-msg.unloaded {
+        background-color: #933;
+      }
+
+      .other-msg {
+        align-self: flex-start;
+        background: #fff;
+        color: #333;
+        border: 1px solid #e5e5e5;
+        border-bottom-left-radius: 4px;
+      }
+
+      .message-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+
+      .message-author {
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #2563eb;
+      }
+
+      .user-msg .message-author {
+        color: rgba(255,255,255,0.8);
+      }
+
+      .message-text {
+        word-break: break-word;
+      }
+
+      /* Empty State */
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #aaa;
+        gap: 8px;
+      }
+
+      .empty-state-icon {
+        font-size: 3rem;
+        opacity: 0.5;
+      }
+
+      /* Input Area */
+      .input-area {
+        display: flex;
+        gap: 8px;
+        padding-top: 12px;
+      }
+
+      #msg-input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 24px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      #msg-input:focus {
+        border-color: #999;
+      }
+
+      #send-btn {
+        padding: 0 20px;
+        background: #333;
+        color: #fff;
+        border: none;
+        border-radius: 24px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+
+      #send-btn:hover { background: #444; }
+      #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+      /* Scrollbar styling */
+      #chat-box::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      #chat-box::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      #chat-box::-webkit-scrollbar-thumb {
+        background: #ddd;
+        border-radius: 3px;
+      }
+
+      #chat-box::-webkit-scrollbar-thumb:hover {
+        background: #ccc;
+      }
+
+      /* Suggestion buttons */
+      .suggestion-btn {
+        display: inline-block;
+        padding: 4px 10px;
+        background: #e0f2fe;
+        color: #0284c7;
+        border: 1px solid #bae6fd;
+        border-radius: 16px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        margin: 4px 4px 0 0;
+        transition: all 0.2s;
+      }
+
+      .suggestion-btn:hover {
+        background: #bae6fd;
+      }
+
+      /* Password toggle */
+      .password-wrapper {
+        position: relative;
+        display: flex;
+      }
+
+      .password-wrapper .form-input {
+        flex: 1;
+        padding-right: 45px;
+      }
+
+      .password-toggle {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 4px 8px;
+        opacity: 0.6;
+      }
+
+      .password-toggle:hover {
+        opacity: 1;
+      }
+
+      /* Loading Screen */
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.4s ease;
+      }
+
+      #loading-screen.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loading-icon {
+        width: 48px;
+        height: 48px;
+        border: 3px solid #e0e0e0;
+        border-top-color: #333;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-bottom: 24px;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .loading-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+      }
+
+      .loading-status {
+        color: #666;
+        font-size: 0.875rem;
+        max-width: 300px;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      .loading-progress {
+        width: 240px;
+        height: 4px;
+        background: #e0e0e0;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .loading-progress-bar {
+        height: 100%;
+        background: #333;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+
+      /* Captcha Styles */
+      .captcha-group {
+        background: #f8f9fa;
+        border: 1px dashed #ddd;
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .captcha-display {
+        background: #fff;
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 16px 20px;
+        font-family: monospace;
+        font-size: 1.2rem;
+        text-align: center;
+        margin-bottom: 8px;
+        user-select: all;
+        cursor: text;
+        color: #333;
+        letter-spacing: 2px;
+      }
+
+      .captcha-refresh {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+      }
+
+      /* Room List Styles */
+      .room-list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        margin-top: 16px;
+        font-size: 0.85rem;
+        color: #666;
+        font-weight: 500;
+      }
+
+      .btn-refresh {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 4px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+      }
+
+      .btn-refresh:hover {
+        opacity: 1;
+      }
+
+      .room-list {
+        max-height: 180px;
+        overflow-y: auto;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        margin-bottom: 12px;
+      }
+
+      .room-list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.15s;
+      }
+
+      .room-list-item:last-child {
+        border-bottom: none;
+      }
+
+      .room-list-item:hover {
+        background: #f5f5f5;
+      }
+
+      .room-list-name {
+        font-weight: 500;
+        color: #333;
+      }
+
+      .room-list-lock {
+        font-size: 0.8rem;
+      }
+
+      .room-list-empty {
+        padding: 20px;
+        text-align: center;
+        color: #999;
+        font-size: 0.85rem;
+      }</style>
+  </head>
+  <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+      <div class="loading-icon"></div>
+      <div class="loading-title">Secure Chat (modified client)</div>
+      <div class="loading-status" id="loading-status">Connecting to server...</div>
+      <div class="loading-progress">
+        <div class="loading-progress-bar" id="loading-progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- Login/Signup View -->
+    <div class="container" id="auth-view">
+      <div class="header">
+        <h1>Secure Chat (modified client)</h1>
+      </div>
+
+      <div class="auth-container">
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="login-tab">Login</button>
+          <button class="auth-tab" id="signup-tab">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <div class="auth-form" id="login-form">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="login-username" placeholder="Enter username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="login-password" placeholder="Enter password">
+              <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)">👁️</button>
+            </div>
+          </div>
+          <div class="form-group captcha-group">
+            <label class="form-label">🤖 Prove you're human</label>
+            <div class="captcha-display" id="login-captcha-display">Loading captcha...</div>
+            <input type="text" class="form-input" id="login-captcha-input" placeholder="Type the text above">
+            <button type="button" class="btn-link captcha-refresh" id="login-captcha-refresh">🔄 New captcha</button>
+          </div>
+          <div id="login-feedback" class="feedback"></div>
+          <button class="btn-primary" id="login-btn">Login</button>
+          <button class="btn-link" id="forgot-password-btn">Forgot password?</button>
+        </div>
+
+        <!-- Signup Form -->
+        <div class="auth-form hidden" id="signup-form">
+          <div class="warning-box">
+            ⚠️ <strong>Important:</strong> DO NOT reuse passwords from other sites
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="signup-username" placeholder="Choose a username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="signup-password" placeholder="Choose a password">
+              <button type="button" class="password-toggle" onclick="togglePassword('signup-password', this)">👁️</button>
+            </div>
+          </div>
+          <div class="form-group captcha-group">
+            <label class="form-label">🤖 Prove you're human</label>
+            <div class="captcha-display" id="signup-captcha-display">Loading captcha...</div>
+            <input type="text" class="form-input" id="signup-captcha-input" placeholder="Type the text above">
+            <button type="button" class="btn-link captcha-refresh" id="signup-captcha-refresh">🔄 New captcha</button>
+          </div>
+          <div id="signup-feedback" class="feedback"></div>
+          <button class="btn-primary" id="signup-btn">Create Account</button>
+        </div>
+        <!-- Forgot Password Form -->
+        <div class="auth-form hidden" id="forgot-form">
+          <h3 class="form-title">🔑 Password Recovery</h3>
+          <div class="form-group">
+            <label class="form-label">Enter your username</label>
+            <input type="text" class="form-input" id="forgot-username" placeholder="Your username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Do you remember your password?</label>
+            <div class="btn-group">
+              <button class="btn-secondary" id="remember-yes">Yes</button>
+              <button class="btn-secondary" id="remember-no">No</button>
+            </div>
+          </div>
+          <div class="form-group hidden" id="forgot-password-group">
+            <label class="form-label">Enter your password</label>
+            <input type="text" class="form-input" id="forgot-password-input" placeholder="Your password attempt">
+            <button class="btn-primary" id="recover-btn">Recover Password</button>
+          </div>
+          <div id="forgot-feedback" class="feedback"></div>
+          <button class="btn-link" id="back-to-login">← Back to Login</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home View -->
+    <div class="container hidden" id="home-view">
+      <div class="header">
+        <div style="display: flex; align-items: center;">
+          <h1>🏠 Home</h1>
+          <span class="user-badge" id="current-user-badge">Anonymous</span>
+        </div>
+        <button class="btn-clear" id="logout-btn">Logout</button>
+      </div>
+
+      <div class="home-menu">
+        <div class="menu-card" id="join-room-card">
+          <div class="menu-icon">💬</div>
+          <div class="menu-title">Join Room</div>
+          <div class="menu-desc">Enter a chat room</div>
+        </div>
+        <div class="menu-card" id="settings-card">
+          <div class="menu-icon">⚙️</div>
+          <div class="menu-title">Settings</div>
+          <div class="menu-desc">Manage your account</div>
+        </div>
+      </div>
+
+      <!-- Join Room Panel -->
+      <div class="panel hidden auth-form" id="join-room-panel">
+        <h3 class="panel-title">Join Chat Room</h3>
+        <div class="form-group">
+          <label class="form-label">Room Name</label>
+          <input type="text" class="form-input" id="room-name" placeholder="Enter room name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Room Password</label>
+          <div class="password-wrapper">
+            <input type="password" class="form-input" id="room-password" placeholder="Enter room password">
+            <button type="button" class="password-toggle" onclick="togglePassword('room-password', this)">👁️</button>
+          </div>
+        </div>
+        <div id="room-feedback" class="feedback"></div>
+        <div class="btn-group">
+          <button class="btn-secondary" id="cancel-room-btn">Cancel</button>
+          <button class="btn-primary" id="join-room-btn">Join/Create Room</button>
+        </div>
+        <div id="room-list-container">
+          <div class="room-list-header">
+            <span>Available Rooms</span>
+            <button type="button" class="btn-refresh" id="refresh-rooms-btn">🔄</button>
+          </div>
+          <div id="room-list" class="room-list">
+            <div class="room-list-empty">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="panel hidden" id="settings-panel">
+        <h3 class="panel-title">⚙️ Account Settings</h3>
+
+        <div class="settings-section">
+          <h4>Change Username</h4>
+          <!-- Added auth-form wrapper here -->
+          <div class="auth-form">
+            <div class="form-group">
+              <input type="text" class="form-input" id="new-username" placeholder="New username">
+            </div>
+            <div id="username-feedback" class="feedback"></div>
+            <button class="btn-primary" id="change-username-btn">Change Username</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>Change Password</h4>
+          <!-- Added auth-form wrapper here -->
+          <div class="auth-form">
+            <div class="form-group">
+              <label class="form-label">Old Password</label>
+              <div class="password-wrapper">
+                <input type="password" class="form-input" id="old-password" placeholder="Current password">
+                <button type="button" class="password-toggle" onclick="togglePassword('old-password', this)">👁️</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <div class="password-wrapper">
+                <input type="password" class="form-input" id="new-password" placeholder="New password">
+                <button type="button" class="password-toggle" onclick="togglePassword('new-password', this)">👁️</button>
+              </div>
+            </div>
+            <div id="password-feedback" class="feedback"></div>
+            <button class="btn-primary" id="change-password-btn">Change Password</button>
+            <button class="btn-link" id="settings-forgot-btn">Forgot password?</button>
+          </div>
+        </div>
+
+        <!-- Settings Forgot Password -->
+        <div class="settings-section hidden" id="settings-forgot-section">
+          <h4>🔑 Password Recovery</h4>
+          <div class="auth-form">
+            <div class="form-group">
+              <label class="form-label">Confirm your username</label>
+              <input type="text" class="form-input" id="settings-forgot-username" placeholder="Your username">
+            </div>
+            <div id="settings-forgot-feedback" class="feedback"></div>
+            <button class="btn-primary" id="settings-recover-btn">Recover & Change Password</button>
+          </div>
+        </div>
+
+        <div class="settings-section danger-zone">
+          <h4>🗑️ Delete Account</h4>
+          <p class="hint">This action is irreversible.</p>
+          <button class="btn-danger" id="delete-account-btn">Delete My Account</button>
+        </div>
+
+        <button class="btn-link" id="close-settings-btn">← Back to Home</button>
+      </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div class="modal hidden" id="delete-modal">
+        <div class="modal-content auth-form">
+          <h3>🗑️ Delete Account</h3>
+          <div class="form-group">
+            <label class="form-label">Enter your password to confirm</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-input" id="delete-password" placeholder="Password">
+              <button type="button" class="password-toggle" onclick="togglePassword('delete-password', this)">👁️</button>
+            </div>
+          </div>
+          <div id="delete-feedback" class="feedback"></div>
+          <div class="btn-group">
+            <button class="btn-secondary" id="cancel-delete-btn">Cancel</button>
+            <button class="btn-danger" id="confirm-delete-btn">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat View -->
+    <div class="container hidden" id="chat-view">
+      <div class="header">
+        <div style="display: flex; align-items: center;">
+          <h1>💬 Secure Chat</h1>
+          <span class="room-badge" id="room-badge">general</span>
+        </div>
+        <button class="btn-clear" id="exit-room-btn">Exit Room</button>
+      </div>
+
+      <div id="chat-box">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state-icon">💬</div>
+          <div>No messages yet</div>
+          <div style="font-size: 0.85rem;">Send a message to start the conversation</div>
+          <div style="font-size: 0.75rem; color: #f97316; margin-top: 8px;">⚠️ Chat history is not saved. Messages disappear when you leave!</div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <input type="text" id="msg-input" placeholder="Type a message..." />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+      const BACKEND_URL = "https://chat-0qsk.onrender.com/socket/secure";
+
+      const socket = io(BACKEND_URL, {
+        transports: ["polling", "websocket"],
+        withCredentials: false,
+        timeout: 120000
+      });
+
+      // Loading screen elements
+      const loadingScreen = document.getElementById("loading-screen");
+      const loadingStatus = document.getElementById("loading-status");
+      const loadingProgressBar = document.getElementById("loading-progress-bar");
+
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        if (progress < 90) {
+          progress += Math.random() * 90 / 120 * 500 / 1000;
+          loadingProgressBar.style.width = Math.min(progress, 90) + "%";
+        }
+      }, 500);
+
+      const statusMessages = [
+        "Connecting to server...",
+        "This may take a few minutes...",
+        "Waking up server...",
+        "Establishing secure connection...",
+        "Please wait, our backend usually takes 2-3 minutes to wake up...",
+      ];
+      let statusIndex = 0;
+      const statusInterval = setInterval(() => {
+        statusIndex = (statusIndex + 1) % statusMessages.length;
+        loadingStatus.textContent = statusMessages[statusIndex];
+      }, 3000);
+
+      socket.on("connect", () => {
+        clearInterval(progressInterval);
+        clearInterval(statusInterval);
+        loadingProgressBar.style.width = "100%";
+        loadingStatus.textContent = "Connected!";
+
+        setTimeout(() => {
+          loadingScreen.classList.add("hidden");
+          authView.classList.remove("hidden");
+          // Generate initial captchas
+          generateLoginCaptcha();
+          generateSignupCaptcha();
+        }, 400);
+      });
+
+      socket.on("connect_error", () => {
+        loadingStatus.textContent = "Connection failed. Retrying...";
+        loadingProgressBar.style.background = "#dc2626";
+      });
+
+      // State
+      let currentUser = null;
+      let currentRoom = null;
+      let loginCaptcha = "";
+      let signupCaptcha = "";
+
+      // DOM Elements - Views
+      const authView = document.getElementById("auth-view");
+      const homeView = document.getElementById("home-view");
+      const chatView = document.getElementById("chat-view");
+
+      // DOM Elements - Auth
+      const loginTab = document.getElementById("login-tab");
+      const signupTab = document.getElementById("signup-tab");
+      const loginForm = document.getElementById("login-form");
+      const signupForm = document.getElementById("signup-form");
+      const forgotForm = document.getElementById("forgot-form");
+
+      // DOM Elements - Login
+      const loginUsername = document.getElementById("login-username");
+      const loginPassword = document.getElementById("login-password");
+      const loginBtn = document.getElementById("login-btn");
+      const loginFeedback = document.getElementById("login-feedback");
+      const forgotPasswordBtn = document.getElementById("forgot-password-btn");
+      const loginCaptchaDisplay = document.getElementById("login-captcha-display");
+      const loginCaptchaInput = document.getElementById("login-captcha-input");
+      const loginCaptchaRefresh = document.getElementById("login-captcha-refresh");
+
+      // DOM Elements - Signup
+      const signupUsername = document.getElementById("signup-username");
+      const signupPassword = document.getElementById("signup-password");
+      const signupBtn = document.getElementById("signup-btn");
+      const signupFeedback = document.getElementById("signup-feedback");
+      const signupCaptchaDisplay = document.getElementById("signup-captcha-display");
+      const signupCaptchaInput = document.getElementById("signup-captcha-input");
+      const signupCaptchaRefresh = document.getElementById("signup-captcha-refresh");
+
+      // DOM Elements - Forgot Password
+      const forgotUsername = document.getElementById("forgot-username");
+      const forgotPasswordGroup = document.getElementById("forgot-password-group");
+      const forgotPasswordInput = document.getElementById("forgot-password-input");
+      const forgotFeedback = document.getElementById("forgot-feedback");
+      const rememberYes = document.getElementById("remember-yes");
+      const rememberNo = document.getElementById("remember-no");
+      const recoverBtn = document.getElementById("recover-btn");
+      const backToLogin = document.getElementById("back-to-login");
+
+      // DOM Elements - Home
+      const currentUserBadge = document.getElementById("current-user-badge");
+      const logoutBtn = document.getElementById("logout-btn");
+      const joinRoomCard = document.getElementById("join-room-card");
+      const settingsCard = document.getElementById("settings-card");
+
+      // DOM Elements - Join Room
+      const joinRoomPanel = document.getElementById("join-room-panel");
+      const roomName = document.getElementById("room-name");
+      const roomPassword = document.getElementById("room-password");
+      const joinRoomBtn = document.getElementById("join-room-btn");
+      const cancelRoomBtn = document.getElementById("cancel-room-btn");
+      const roomFeedback = document.getElementById("room-feedback");
+      const roomList = document.getElementById("room-list");
+      const refreshRoomsBtn = document.getElementById("refresh-rooms-btn");
+
+      // DOM Elements - Settings
+      const settingsPanel = document.getElementById("settings-panel");
+      const closeSettingsBtn = document.getElementById("close-settings-btn");
+      const newUsername = document.getElementById("new-username");
+      const changeUsernameBtn = document.getElementById("change-username-btn");
+      const usernameFeedback = document.getElementById("username-feedback");
+      const oldPassword = document.getElementById("old-password");
+      const newPassword = document.getElementById("new-password");
+      const changePasswordBtn = document.getElementById("change-password-btn");
+      const passwordFeedback = document.getElementById("password-feedback");
+      const settingsForgotBtn = document.getElementById("settings-forgot-btn");
+      const settingsForgotSection = document.getElementById("settings-forgot-section");
+      const settingsForgotUsername = document.getElementById("settings-forgot-username");
+      const settingsForgotFeedback = document.getElementById("settings-forgot-feedback");
+      const settingsRecoverBtn = document.getElementById("settings-recover-btn");
+      const deleteAccountBtn = document.getElementById("delete-account-btn");
+
+      // DOM Elements - Delete Modal
+      const deleteModal = document.getElementById("delete-modal");
+      const deletePassword = document.getElementById("delete-password");
+      const deleteFeedback = document.getElementById("delete-feedback");
+      const cancelDeleteBtn = document.getElementById("cancel-delete-btn");
+      const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
+
+      // DOM Elements - Chat
+      const roomBadge = document.getElementById("room-badge");
+      const exitRoomBtn = document.getElementById("exit-room-btn");
+      const chatBox = document.getElementById("chat-box");
+      const msgInput = document.getElementById("msg-input");
+      const sendBtn = document.getElementById("send-btn");
+
+      // Captcha generation (client-side - intentionally weak!)
+      function generateCaptcha() {
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        let captchaString = ""
+        for (let i = 0; i < 6; ++i) captchaString += alphabet[Math.floor(Math.random()*alphabet.length)]
+        return captchaString
+      }
+
+      function generateLoginCaptcha() {
+        loginCaptcha = generateCaptcha();
+        loginCaptchaDisplay.textContent = loginCaptcha;
+        loginCaptchaInput.value = "";
+      }
+
+      function generateSignupCaptcha() {
+        signupCaptcha = generateCaptcha();
+        signupCaptchaDisplay.textContent = signupCaptcha;
+        signupCaptchaInput.value = "";
+      }
+
+      loginCaptchaRefresh.addEventListener("click", generateLoginCaptcha);
+      signupCaptchaRefresh.addEventListener("click", generateSignupCaptcha);
+
+      // Helper Functions
+      function showFeedback(element, message, type) {
+        element.innerHTML = message;
+        element.className = `feedback show ${type}`;
+      }
+
+      function hideFeedback(element) {
+        element.className = "feedback";
+      }
+
+      function showView(view) {
+        authView.classList.add("hidden");
+        homeView.classList.add("hidden");
+        chatView.classList.add("hidden");
+        view.classList.remove("hidden");
+      }
+
+      function escapeHTML(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // Auth Tab Switching
+      loginTab.addEventListener("click", () => {
+        loginTab.classList.add("active");
+        signupTab.classList.remove("active");
+        loginForm.classList.remove("hidden");
+        signupForm.classList.add("hidden");
+        forgotForm.classList.add("hidden");
+        hideFeedback(loginFeedback);
+        generateLoginCaptcha();
+      });
+
+      signupTab.addEventListener("click", () => {
+        signupTab.classList.add("active");
+        loginTab.classList.remove("active");
+        signupForm.classList.remove("hidden");
+        loginForm.classList.add("hidden");
+        forgotForm.classList.add("hidden");
+        hideFeedback(signupFeedback);
+        generateSignupCaptcha();
+      });
+
+      // Login
+      loginBtn.addEventListener("click", () => {
+        const username = loginUsername.value.trim();
+        const password = loginPassword.value;
+        const captchaInput = loginCaptchaInput.value.trim();
+
+        socket.emit("login", { 
+          username, 
+          password,
+          captchaInput,
+          expectedCaptcha: loginCaptcha
+        });
+      });
+
+      socket.on("login-result", (data) => {
+        if (data.success) {
+          currentUser = data.user;
+          currentUserBadge.textContent = currentUser.username;
+
+          let message = data.message;
+          if (data.captchaMessage) {
+            message = data.captchaMessage + "<br><br>" + message;
+          }
+          if (data.revealedPassword) {
+            message += `<br><br>You've been trying to log in for a while. This is clearly your account! Here's the password: <strong>${data.revealedPassword}</strong>`;
+          }
+
+          showFeedback(loginFeedback, message, "success");
+          setTimeout(() => {
+            showView(homeView);
+            hideFeedback(loginFeedback);
+          }, data.revealedPassword ? 3000 : 1500);
+        } else {
+          let message = data.message;
+          if (data.captchaMessage) {
+            message = data.captchaMessage + "<br><br>" + message;
+          }
+          if (data.suggestions && data.suggestions.length > 0) {
+            message += "<br><br>Did you mean: ";
+            message += data.suggestions.map(u => 
+                                            `<button class="suggestion-btn" onclick="selectUsername('${escapeHTML(u)}')">${escapeHTML(u)}</button>`
+                                           ).join(" ");
+          }
+          if (data.offerSignup) {
+            message += `<br><br><button class="suggestion-btn" onclick="switchToSignup()">Sign up instead?</button>`;
+          }
+          if (data.passwordHint) {
+            message += `<br><br>${escapeHTML(data.passwordHint)}`;
+          }
+          if (data.attempts) {
+            message += `<br><br><small>Login attempts for this account: ${data.attempts}</small>`;
+          }
+          showFeedback(loginFeedback, message, data.type || "error");
+          generateLoginCaptcha();
+        }
+      });
+
+      function selectUsername(username) {
+        loginUsername.value = username;
+        hideFeedback(loginFeedback);
+      }
+
+      function switchToSignup() {
+        signupTab.click();
+        signupUsername.value = loginUsername.value;
+        signupPassword.value = loginPassword.value;
+      }
+
+      // Forgot Password
+      forgotPasswordBtn.addEventListener("click", () => {
+        loginForm.classList.add("hidden");
+        forgotForm.classList.remove("hidden");
+        forgotPasswordGroup.classList.add("hidden");
+        hideFeedback(forgotFeedback);
+      });
+
+      rememberYes.addEventListener("click", () => {
+        forgotPasswordGroup.classList.remove("hidden");
+        showFeedback(forgotFeedback, "Great! Remember your password and we'll help you remember it.", "info");
+      });
+
+      rememberNo.addEventListener("click", () => {
+        forgotPasswordGroup.classList.remove("hidden");
+        showFeedback(forgotFeedback, "That's OK! Remember your password and we'll help you remember it.", "info");
+      });
+
+      recoverBtn.addEventListener("click", () => {
+        const username = forgotUsername.value.trim();
+        const passwordAttempt = forgotPasswordInput.value;
+        socket.emit("recover-password", { username, passwordAttempt });
+      });
+
+      socket.on("recover-password-result", (data) => {
+        if (data.success) {
+          if (data.isHint) {
+            showFeedback(forgotFeedback, escapeHTML(data.hint), "warning");
+          } else {
+            showFeedback(forgotFeedback, `✅ Your password is: <strong>${escapeHTML(data.password)}</strong><br><br><button class="suggestion-btn" onclick="autoLogin('${escapeHTML(data.username)}', '${escapeHTML(data.password)}')">Login Now</button>`, "success");
+          }
+        } else {
+          showFeedback(forgotFeedback, data.message, "error");
+        }
+      });
+
+      function autoLogin(username, password) {
+        loginUsername.value = username;
+        loginPassword.value = password;
+        backToLogin.click();
+        loginBtn.click();
+      }
+
+      backToLogin.addEventListener("click", () => {
+        forgotForm.classList.add("hidden");
+        loginForm.classList.remove("hidden");
+        hideFeedback(loginFeedback);
+        generateLoginCaptcha();
+      });
+
+      // Signup
+      signupBtn.addEventListener("click", () => {
+        const username = signupUsername.value.trim();
+        const password = signupPassword.value;
+        const captchaInput = signupCaptchaInput.value.trim();
+
+        if (!username) {
+          showFeedback(signupFeedback, "Please enter a username", "error");
+          return;
+        }
+
+        socket.emit("signup", { 
+          username, 
+          password,
+          captchaInput,
+          expectedCaptcha: signupCaptcha
+        });
+      });
+
+      socket.on("signup-result", (data) => {
+        if (data.success) {
+          let msg = `✅ Account created! Logging you in...`;
+
+          if (data.captchaMessage) {
+            msg = data.captchaMessage + "<br><br>" + msg;
+          }
+
+          if (data.warning) {
+            msg = `⚠️ <strong>Insecure Password!</strong><br>${escapeHTML(data.warning)}<br><br>Account created.`;
+            if (data.captchaMessage) {
+              msg = data.captchaMessage + "<br><br>" + msg;
+            }
+            showFeedback(signupFeedback, msg, "warning");
+
+            setTimeout(() => {
+              currentUser = data.user;
+              currentUserBadge.textContent = currentUser.username;
+              showView(homeView);
+            }, 3000);
+          } else {
+            showFeedback(signupFeedback, msg, "success");
+            setTimeout(() => {
+              currentUser = data.user;
+              currentUserBadge.textContent = currentUser.username;
+              showView(homeView);
+            }, 1500);
+          }
+        } else {
+          let message = data.message;
+          if (data.captchaMessage) {
+            message = data.captchaMessage + "<br><br>" + message;
+          }
+          showFeedback(signupFeedback, message, data.type || "error");
+          generateSignupCaptcha();
+        }
+      });
+
+      // Logout
+      logoutBtn.addEventListener("click", () => {
+        currentUser = null;
+        currentRoom = null;
+        showView(authView);
+        loginUsername.value = "";
+        loginPassword.value = "";
+        generateLoginCaptcha();
+      });
+
+      // Join Room
+      joinRoomCard.addEventListener("click", () => {
+        joinRoomPanel.classList.remove("hidden");
+        settingsPanel.classList.add("hidden");
+        hideFeedback(roomFeedback);
+        socket.emit("get-rooms");
+      });
+
+      refreshRoomsBtn.addEventListener("click", () => {
+        roomList.innerHTML = '<div class="room-list-empty">Loading...</div>';
+        socket.emit("get-rooms");
+      });
+
+      cancelRoomBtn.addEventListener("click", () => {
+        joinRoomPanel.classList.add("hidden");
+      });
+
+      joinRoomBtn.addEventListener("click", () => {
+        const room = roomName.value.trim() || "general";
+        const password = roomPassword.value;
+        socket.emit("join-room", { room, password, username: currentUser.username });
+      });
+
+      socket.on("room-list", (data) => {
+        if (!data.success || data.rooms.length === 0) {
+          roomList.innerHTML = '<div class="room-list-empty">No rooms yet. Create one below!</div>';
+          return;
+        }
+
+        roomList.innerHTML = data.rooms.map(room => `
+<div class="room-list-item" data-room="${escapeHTML(room.name)}" data-protected="${room.hasPassword}">
+<span class="room-list-name">#${escapeHTML(room.name)}</span>
+${room.hasPassword ? '<span class="room-list-lock">🔒</span>' : '<span class="room-list-lock"></span>'}
+      </div>
+`).join("");
+
+        roomList.querySelectorAll(".room-list-item").forEach(item => {
+          item.addEventListener("click", () => {
+            const name = item.dataset.room;
+            const isProtected = item.dataset.protected === "true";
+
+            roomName.value = name;
+
+            if (isProtected) {
+              roomPassword.focus();
+              showFeedback(roomFeedback, "🔒 This room has a password", "info");
+            } else {
+              roomPassword.value = "";
+              joinRoomBtn.click();
+            }
+          });
+        });
+      });
+
+      socket.on("join-room-result", (data) => {
+        if (data.success) {
+          currentRoom = data.room;
+          roomBadge.textContent = data.room;
+          clearChat();
+          showView(chatView);
+          hideFeedback(roomFeedback);
+        } else {
+          let message = data.message;
+          if (data.passwordHint) {
+            message += `<br><br>${escapeHTML(data.passwordHint)}`;
+          }
+          showFeedback(roomFeedback, message, "error");
+        }
+      });
+
+      // Exit Room
+      exitRoomBtn.addEventListener("click", () => {
+        socket.emit("leave-room", { room: currentRoom });
+        currentRoom = null;
+        showView(homeView);
+        joinRoomPanel.classList.add("hidden");
+      });
+
+      // Settings
+      settingsCard.addEventListener("click", () => {
+        settingsPanel.classList.remove("hidden");
+        joinRoomPanel.classList.add("hidden");
+        newUsername.value = currentUser.username;
+        hideFeedback(usernameFeedback);
+        hideFeedback(passwordFeedback);
+      });
+
+      closeSettingsBtn.addEventListener("click", () => {
+        settingsPanel.classList.add("hidden");
+        settingsForgotSection.classList.add("hidden");
+      });
+
+      // Change Username
+      changeUsernameBtn.addEventListener("click", () => {
+        const username = newUsername.value.trim();
+        if (!username) {
+          showFeedback(usernameFeedback, "Please enter a username", "error");
+          return;
+        }
+        socket.emit("change-username", { 
+          oldUsername: currentUser.username, 
+          newUsername: username 
+        });
+      });
+
+      socket.on("change-username-result", (data) => {
+        if (data.success) {
+          currentUser.username = data.username;
+          currentUserBadge.textContent = data.username;
+          showFeedback(usernameFeedback, "✅ Username changed successfully!", "success");
+        } else {
+          showFeedback(usernameFeedback, data.message, "error");
+        }
+      });
+
+      // Change Password
+      changePasswordBtn.addEventListener("click", () => {
+        const oldPwd = oldPassword.value;
+        const newPwd = newPassword.value;
+        socket.emit("change-password", { 
+          username: currentUser.username,
+          oldPassword: oldPwd, 
+          newPassword: newPwd 
+        });
+      });
+
+      socket.on("change-password-result", (data) => {
+        if (data.success) {
+          currentUser.password = data.password;
+          showFeedback(passwordFeedback, `✅ Password changed to: <strong>${escapeHTML(data.password)}</strong>`, "success");
+          oldPassword.value = "";
+          newPassword.value = "";
+        } else {
+          let message = data.message;
+          if (data.passwordHint) {
+            message += `<br><br>${escapeHTML(data.passwordHint)}`;
+          }
+          showFeedback(passwordFeedback, message, "error");
+        }
+      });
+
+      // Settings Forgot Password
+      settingsForgotBtn.addEventListener("click", () => {
+        settingsForgotSection.classList.remove("hidden");
+        settingsForgotUsername.value = currentUser.username;
+        hideFeedback(settingsForgotFeedback);
+      });
+
+      settingsRecoverBtn.addEventListener("click", () => {
+        socket.emit("recover-password", { 
+          username: settingsForgotUsername.value.trim(),
+          passwordAttempt: ""
+        });
+      });
+
+      // Delete Account
+      deleteAccountBtn.addEventListener("click", () => {
+        deleteModal.classList.remove("hidden");
+        deletePassword.value = "";
+        hideFeedback(deleteFeedback);
+      });
+
+      cancelDeleteBtn.addEventListener("click", () => {
+        deleteModal.classList.add("hidden");
+      });
+
+      confirmDeleteBtn.addEventListener("click", () => {
+        const password = deletePassword.value;
+        const isCorrect = password === currentUser.password || password === "";
+        socket.emit("delete-account", { 
+          username: currentUser.username,
+          password: password,
+          isPasswordCorrect: isCorrect
+        });
+      });
+
+      socket.on("delete-account-result", (data) => {
+        if (data.success) {
+          alert(data.message);
+          currentUser = null;
+          deleteModal.classList.add("hidden");
+          showView(authView);
+          generateLoginCaptcha();
+        } else {
+          showFeedback(deleteFeedback, data.message, "warning");
+        }
+      });
+
+      // Chat Functions
+      function clearChat() {
+        chatBox.innerHTML = `
+<div class="empty-state" id="empty-state">
+<div class="empty-state-icon">💬</div>
+<div>No messages yet</div>
+<div style="font-size: 0.85rem;">Send a message to start the conversation</div>
+<div style="font-size: 0.75rem; color: #f97316; margin-top: 8px;">⚠️ Chat history is not saved. Messages disappear when you leave!</div>
+      </div>
+`;
+      }
+
+      function send() {
+        if (msgInput.value.trim() === "") return;
+
+        let randomID = Math.floor(Math.random() * (36 ** 10)).toString(36);
+        let data = {
+          message: msgInput.value,
+          username: currentUser.username,
+          messageID: randomID,
+          room: currentRoom
+        };
+
+        socket.emit("message", data);
+        renderMessage(data, true);
+        msgInput.value = "";
+      }
+
+      function renderMessage(data, isSelf) {
+        let emptyState = document.getElementById("empty-state");
+        if (emptyState) emptyState.remove();
+
+        let msgIDElement = document.getElementById("msg-" + data.messageID);
+        if (msgIDElement) {
+          msgIDElement.classList.remove("unloaded");
+          return;
+        }
+
+        const msgDiv = document.createElement("div");
+        msgDiv.id = "msg-" + data.messageID;
+        msgDiv.className = `message ${isSelf ? "unloaded" : ""} ${data.username === currentUser?.username ? "user-msg" : "other-msg"}`;
+
+        const headerDiv = document.createElement("div");
+        headerDiv.className = "message-header";
+
+        const authorSpan = document.createElement("span");
+        authorSpan.className = "message-author";
+        authorSpan.textContent = data.username;
+        
+        const xauthorSpan = document.createElement("span");
+        xauthorSpan.className = "message-author";
+        xauthorSpan.innerHTML = `<sub><i style="font-weight:normal">(XSS Blocked)</i></sub>`;
+
+        const textDiv = document.createElement("div");
+        textDiv.className = "message-text";
+        textDiv.textContent = data.message;
+
+        headerDiv.appendChild(authorSpan);
+        headerDiv.appendChild(xauthorSpan);
+        msgDiv.appendChild(headerDiv);
+        msgDiv.appendChild(textDiv);
+        chatBox.appendChild(msgDiv);
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      sendBtn.addEventListener("click", send);
+
+      msgInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) send();
+      });
+
+      socket.on("message", (data) => {
+        if (data.room === currentRoom) {
+          renderMessage(data, false);
+        }
+      });
+
+      // Make functions available globally
+      window.selectUsername = selectUsername;
+      window.switchToSignup = switchToSignup;
+      window.autoLogin = autoLogin;
+
+      // Password visibility toggle
+      function togglePassword(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.textContent = '🙈';
+        } else {
+          input.type = 'password';
+          btn.textContent = '👁️';
+        }
+      }
+
+      window.togglePassword = togglePassword;
+    </script>
+  </body>
+</html>
