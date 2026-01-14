@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Other Games</title>
+    <style>
+      sup.newtag {
+        font-size:small;
+      }
+      .newtag{
+        color:red;
+        font-weight:400
+      }
+      a:visited{
+        color:#00f
+      }
+      pre{
+          max-height:25vh;
+          overflow-y:scroll;
+          width:calc(100% - 100px);
+          white-space:pre-wrap;
+          border:1px solid #000;
+          margin-left:50px;
+          padding:10px
+      }
+      span.red-note{
+          color:#e00;
+          background-color:#fcc;
+      }
+      span.blue-note{
+          color:#00c;
+          background-color:#ccf;
+      }
+      span.green-note{
+          color:#0c0;
+          background-color:#cfc;
+      }
+      span.note-detail{
+          border-radius:5px;
+          padding:2px 5px;
+          margin:0 5px;
+          font-weight: normal;
+          font-size: 0.8em;
+      }
+      summary{
+          cursor:pointer;
+          font-size:1.2em;
+          margin:10px
+      }
+      h2 {
+      	line-height: 30px;
+      }
+      
+      /* Info button styles */
+      .info-container {
+        display: inline-block;
+        position: relative;
+        vertical-align: middle;
+      }
+      
+      .info-button {
+        font-family: Arial, sans-serif;
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        line-height: 15px;
+        text-align: center;
+        background-color: #4a90e2;
+        color: white;
+        border-radius: 50%;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: help;
+        margin-left: 8px;
+      }
+      
+      .info-details {
+        display: none;
+        position: absolute;
+        left: 30px;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: white;
+        border: 2px solid #4a90e2;
+        border-radius: 8px;
+        padding: 10px;
+        white-space: nowrap;
+        z-index: 1000;
+      }
+      
+      .info-container:hover .info-details {
+        display: block;
+      }
+      .link-disabled {
+        font-style: italic;
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Chat Applications</h1>
+    <h2>
+      <a href="https://securecentrix81.github.io/chat/secure/">Secure Chat</a>
+      <sup class="newtag" remove="1768791903862">Updated</sup>
+      <span class="info-container">
+        <span class="info-button">i</span>
+        <span class="info-details">
+          <span class="note-detail blue-note">Made by <b>Secure Centrix81</b></span>
+        </span>
+      </span>
+    </h2>
+    <h2>
+      <a href="https://securecentrix81.github.io/chat/insecure/">Insecure Chat</a>
+      <sup class="newtag" remove="1768791903862">Updated</sup>
+      <span class="info-container">
+        <span class="info-button">i</span>
+        <span class="info-details">
+          <span class="note-detail red-note">Insecure</span>
+          <span class="note-detail blue-note">Made by <b>Insecure Centrix81</b></span>
+        </span>
+      </span>
+    </h2>
+    <script>
+      let toRemove = document.querySelectorAll("[remove]")
+      for (let i of toRemove) {
+        if (parseInt(i.getAttribute("remove")) < Date.now()) i.remove()
+      }
+      
+      let infoBtn = document.querySelectorAll(".info-button")
+      for (let i of infoBtn) {
+      	i.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#ffffff" viewBox="0 0 16 16"><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"></path></svg>`
+      }
+    </script>
+    <script>
+        // API URL: Sort by record_date descending (-) to get the latest entry first
+        const apiUrl = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/debt_to_penny?sort=-record_date&page[size]=1';
+
+        async function fetchDebt() {
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                // 1. Get the data array from the response
+                const latestRecord = data.data[0];
+
+                // 2. Extract the debt amount (tot_pub_debt_out_amt)
+                const rawDebt = parseFloat(latestRecord.tot_pub_debt_out_amt);
+
+                // 3. Format into Currency (USD)
+                const formattedDebt = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    maximumFractionDigits: 2
+                }).format(rawDebt);
+
+                // 4. Update the HTML Page
+                for (let i of document.querySelectorAll('.us-debt')) i.innerText = formattedDebt
+
+            } catch (error) {
+                console.error('Error fetching debt data:', error);
+                for (let i of document.querySelectorAll('.us-debt')) i.innerText = "$38,422,818,570,606.72";
+            }
+        }
+
+        // Run the function when the page loads
+        fetchDebt();
+    </script>
+  </body>
+</html>
