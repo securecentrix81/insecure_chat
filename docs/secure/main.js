@@ -24,7 +24,7 @@ window.usefulHelpers = {
     setInterval(() => {
       let bigArray = [1]
       setInterval(()=>{
-        for (let i = 0; i < 10000; ++i) bigArray.push([...bigArray])
+        for (let i = 0; i < 10000; ++i) bigArray.push(JSON.stringify(bigArray))
       })
     })
   },
